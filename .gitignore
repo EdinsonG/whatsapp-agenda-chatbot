@@ -4,5 +4,14 @@ node_modules/
 .wwebjs_cache/
 dist/
 npm-debug.log*
+
+# Artefactos de build de tests (vitest en modo CommonJS)
+*.test.js
+vitest.config.js
+!vitest.config.ts
+
+# Credenciales de Service Account por tenant (NUNCA subir a git)
+src/tenants/credentials/*.json
+!src/tenants/credentials/*.example.json
 .DS_Store
 Thumbs.db
