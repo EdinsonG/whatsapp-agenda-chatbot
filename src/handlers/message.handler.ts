@@ -1,42 +1,89 @@
 import { Message } from 'whatsapp-web.js';
-import { getIAResponse } from '../services/ia.service';
-import { limiter, randomDelay } from '../services/limiter.service';
+import { TenantManager } from '../tenants/tenant.manager';
+import { getTenantAIResponse } from '../services/groq.service';
+import { GoogleCalendarService } from '../services/google-calendar.service';
+import { getLimiter, randomDelay } from '../services/limiter.service';
+import { TenantConfig } from '../tenants/types';
+
+const tenantManager = new TenantManager();
+
+const calendarCache = new Map<string, GoogleCalendarService>();
+
+const getCalendar = (tenant: TenantConfig): GoogleCalendarService => {
+    let calendar = calendarCache.get(tenant.id);
+    if (!calendar) {
+        calendar = new GoogleCalendarService(tenant);
+        calendarCache.set(tenant.id, calendar);
+    }
+    return calendar;
+};
+
+const getTodayAvailableSummary = async (
+    calendar: GoogleCalendarService,
+    tenant: TenantConfig
+): Promise<string[]> => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const slots = await calendar.getAvailableSlotsForDate(today);
+    return slots
+        .filter((s) => s.start.getHours() >= now.getHours())
+        .map((s) => `${String(s.start.getHours()).padStart(2, '0')}:00`);
+};
 
 export const handleMessage = async (msg: Message) => {
-    // 1. Filtro de seguridad: Evitar grupos y mensajes vacíos
     if (msg.from.includes('@g.us')) return;
 
-    const text = msg.body.toLowerCase().trim();
+    const text = msg.body.trim();
     if (!text) return;
+
+    const tenant = tenantManager.resolveByWhatsApp(msg.from);
+    if (!tenant) {
+        await msg.reply('Lo siento, aún no tengo configurado el servicio para este número.');
+        return;
+    }
+
+    const { config } = tenant;
+    const limiter = getLimiter(config);
 
     await limiter.schedule(async () => {
         const chat = await msg.getChat();
-        
+
         try {
             await chat.sendSeen();
             await randomDelay();
             await chat.sendStateTyping();
 
-            const aiResponse = await getIAResponse(text);
-            const statsKeywords = [
-                'récord', 'goles', 'máximo goleador', 'partidos', 
-                'asistencias', 'títulos', 'palmarés', 'fifa', 'uefa', 
-                'balón de oro', 'pichichi', 'botas de oro'
-            ];
+            const calendar = getCalendar(config);
+            let availableSummary: string[] = [];
+            try {
+                availableSummary = await getTodayAvailableSummary(calendar, config);
+            } catch {
+                availableSummary = [];
+            }
 
-            const isStatsQuery = statsKeywords.some(keyword => text.includes(keyword));
-            
-            let verificationNote = "";
-            if (isStatsQuery) { verificationNote = "\n\n✅ *Datos verificados según registros oficiales de UEFA/FIFA/RealMadrid.com*"; }
+            const ai = await getTenantAIResponse(text, config, availableSummary);
 
-            const emojis = [" ⚪", " 🏆", " ✨", " 👑", " 🛡️"];
-            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            if (ai.scheduleIntent) {
+                const result = await calendar.bookAppointment(
+                    ai.scheduleIntent.date,
+                    ai.scheduleIntent.startHour,
+                    ai.scheduleIntent.customerName,
+                    ai.scheduleIntent.notes
+                );
 
-            await msg.reply(`${aiResponse}${randomEmoji}${verificationNote}`);
+                await randomDelay(800, 2000);
+                await msg.reply(
+                    result.success
+                        ? `✅ ${result.message}`
+                        : `😔 ${result.message}`
+                );
+                return;
+            }
 
+            await msg.reply(ai.content);
         } catch (error: any) {
-            console.error("Error en el flujo del mensaje:", error.message);
-            await msg.reply("El VAR está revisando una incidencia técnica. ¡Hala Madrid! ⚪");
+            console.error('Error en el flujo del mensaje:', error.message);
+            await msg.reply('Ocurrió un inconveniente técnico. Por favor intenta de nuevo en un momento.');
         } finally {
             await chat.clearState();
         }

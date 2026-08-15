@@ -1,0 +1,22 @@
+{
+  "id": "demo-clinica",
+  "businessName": "Clínica Dental Sonrisa",
+  "timezone": "America/Mexico_City",
+  "openHour": 8,
+  "closeHour": 18,
+  "slotIntervalMin": 60,
+  "appointmentDurationMin": 45,
+  "systemPrompt": "Agrega aquí contexto extra específico de la clínica: especialidades, doctores, sucursales, promociones...",
+  "calendar": {
+    "serviceAccountEmail": "demo-clinica@proyecto-calendar.iam.gserviceaccount.com",
+    "calendarId": "primary",
+    "credentialsPath": "src/tenants/credentials/demo-clinica-service-account.json"
+  },
+  "whatsapp": {
+    "sessionId": "demo-clinica",
+    "rateLimit": {
+      "maxConcurrent": 1,
+      "minTimeMs": 2500
+    }
+  }
+}

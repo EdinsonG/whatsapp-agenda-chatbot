@@ -1,18 +1,31 @@
 import express from 'express';
+import { env } from './config/env';
+import { TenantManager } from './tenants/tenant.manager';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(express.json());
 
 export const startHealthCheck = () => {
+    const tenantManager = new TenantManager();
+
     app.get('/health', (req, res) => {
-        res.status(200).json({ 
-            status: 'ok', 
+        res.status(200).json({
+            status: 'ok',
             uptime: process.uptime(),
-            message: 'MerengueBot está en el campo' 
+            tenants: tenantManager.getAll().length,
         });
     });
 
-    app.listen(PORT, () => {
-        console.log(`Servidor de monitoreo corriendo en el puerto ${PORT}`);
+    app.get('/tenants', (req, res) => {
+        res.status(200).json(
+            tenantManager.getAll().map((t) => ({
+                id: t.id,
+                businessName: t.config.businessName,
+            }))
+        );
+    });
+
+    app.listen(env.PORT, () => {
+        console.log(`Servidor de monitoreo corriendo en el puerto ${env.PORT}`);
     });
 };
