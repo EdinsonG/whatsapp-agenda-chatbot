@@ -1,13 +1,17 @@
 {
-  "name": "real-madrid-bot",
+  "name": "agenda-whatsapp-chatbot",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "pnpm run clean && tsc",
     "start": "node dist/index.js",
-    "test:local": "ts-node src/test-local.ts"
+    "cli": "ts-node src/test-cli.ts",
+    "cli:nlp": "ts-node src/test-cli-nlp.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -16,9 +20,11 @@
     "bottleneck": "^2.19.5",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "googleapis": "^174.0.1",
     "groq-sdk": "^1.1.1",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.34.6"
+    "whatsapp-web.js": "^1.34.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -26,6 +32,7 @@
     "@types/qrcode-terminal": "^0.12.2",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.10"
   }
 }
