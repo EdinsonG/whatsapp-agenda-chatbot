@@ -1,8 +1,7 @@
 import Groq from 'groq-sdk';
-import { TenantConfig } from '../tenants/types';
+import { CalendarService, TenantConfig, ToolCallResult } from '../interfaces';
 import { buildSchedulingSystemPrompt } from '../prompts/scheduling.prompt';
 import { env } from '../config/env';
-import { CalendarService } from './calendar.interface';
 
 export const TOOL_AVAILABLE_SLOTS = 'get_available_slots';
 export const TOOL_BOOK = 'book_appointment';
@@ -66,11 +65,6 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
         },
     },
 ];
-
-export interface ToolCallResult {
-    name: string;
-    content: string;
-}
 
 export class GroqConversationService {
     private groq: Groq;

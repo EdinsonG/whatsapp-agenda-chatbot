@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk';
-import { TenantConfig } from '../tenants/types';
+import { AIResponse, ScheduleIntent, TenantConfig } from '../interfaces';
 import { buildSchedulingSystemPrompt } from '../prompts/scheduling.prompt';
 import { env } from '../config/env';
 
@@ -39,18 +39,6 @@ const schedulingTools: Groq.Chat.Completions.ChatCompletionTool[] = [
         },
     },
 ];
-
-export interface ScheduleIntent {
-    date: string;
-    startHour: number;
-    customerName: string;
-    notes?: string;
-}
-
-export interface AIResponse {
-    content: string;
-    scheduleIntent?: ScheduleIntent;
-}
 
 export const getTenantAIResponse = async (
     userMessage: string,

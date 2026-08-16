@@ -1,4 +1,4 @@
-import { TimeSlot } from '../core/scheduling/scheduling.rules';
+import { TimeSlot } from './scheduling';
 
 export interface BookingResult {
     success: boolean;

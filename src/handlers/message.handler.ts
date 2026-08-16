@@ -3,7 +3,7 @@ import { TenantManager } from '../tenants/tenant.manager';
 import { getTenantAIResponse } from '../services/groq.service';
 import { GoogleCalendarService } from '../services/google-calendar.service';
 import { getLimiter, randomDelay } from '../services/limiter.service';
-import { TenantConfig } from '../tenants/types';
+import { TenantConfig } from '../interfaces';
 
 const tenantManager = new TenantManager();
 

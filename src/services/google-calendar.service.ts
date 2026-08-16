@@ -1,16 +1,12 @@
 import { google, calendar_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
-import { TenantConfig } from '../tenants/types';
+import { BookingResult, CalendarService, TenantConfig, TimeSlot } from '../interfaces';
 import {
     getAvailableSlots,
     isSlotAvailable,
-    TimeSlot,
     generateSlots,
 } from '../core/scheduling/scheduling.rules';
-import { BookingResult, CalendarService } from './calendar.interface';
-
-export { BookingResult } from './calendar.interface';
 
 export class GoogleCalendarService implements CalendarService {
     private calendar: calendar_v3.Calendar;

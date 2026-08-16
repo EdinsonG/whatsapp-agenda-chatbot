@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { TimeSlot } from '../src/interfaces';
 import {
     APPOINTMENT_DURATION_MIN,
     SLOT_INTERVAL_MIN,
@@ -9,7 +10,6 @@ import {
     generateSlots,
     getAvailableSlots,
     isWithinBusinessHours,
-    TimeSlot,
 } from '../src/core/scheduling/scheduling.rules';
 
 const slot = (startHour: number, endHour: number): TimeSlot => {

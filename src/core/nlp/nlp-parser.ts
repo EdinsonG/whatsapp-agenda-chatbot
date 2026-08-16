@@ -1,12 +1,4 @@
-export type Intent = 'slots' | 'book' | 'list' | 'greeting' | 'unknown';
-
-export interface ParsedCommand {
-    intent: Intent;
-    date?: string;
-    startHour?: number;
-    customerName?: string;
-    message?: string;
-}
+import { Intent, ParsedCommand } from '../../interfaces';
 
 const DAY_NAMES: Record<string, number> = {
     domingo: 0,

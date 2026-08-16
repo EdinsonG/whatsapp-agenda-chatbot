@@ -1,11 +1,9 @@
-import { TenantConfig } from '../tenants/types';
+import { BookingResult, CalendarService, TenantConfig, TimeSlot } from '../interfaces';
 import {
     getAvailableSlots,
     isSlotAvailable,
-    TimeSlot,
     generateSlots,
 } from '../core/scheduling/scheduling.rules';
-import { BookingResult, CalendarService } from './calendar.interface';
 
 interface StoredEvent {
     id: string;

@@ -1,4 +1,4 @@
-import { TenantConfig } from '../tenants/types';
+import { TenantConfig } from '../interfaces';
 
 export const buildSchedulingSystemPrompt = (tenant: TenantConfig): string => `
 Eres ${tenant.businessName}, un asistente ejecutivo real, cálido y profesional que atiende WhatsApp.

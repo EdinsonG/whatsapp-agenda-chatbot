@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
-import { Tenant, TenantConfig } from './types';
+import { Tenant, TenantConfig } from '../interfaces';
 import { env } from '../config/env';
 
 const tenantSchema = z.object({

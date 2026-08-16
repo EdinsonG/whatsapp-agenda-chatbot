@@ -1,21 +1,9 @@
+import { AvailabilityParams, TimeSlot } from '../../interfaces';
+
 export const APPOINTMENT_DURATION_MIN = 45;
 export const SLOT_INTERVAL_MIN = 60;
 export const DEFAULT_OPEN_HOUR = 8;
 export const DEFAULT_CLOSE_HOUR = 18;
-
-export interface TimeSlot {
-    start: Date;
-    end: Date;
-}
-
-export interface AvailabilityParams {
-    date: string;
-    openHour?: number;
-    closeHour?: number;
-    slotIntervalMin?: number;
-    appointmentDurationMin?: number;
-    timezone?: string;
-}
 
 export const isWithinBusinessHours = (
     date: Date,
