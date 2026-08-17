@@ -1,5 +1,19 @@
 import { TimeSlot } from './scheduling';
 
+export interface BookingCustomer {
+    firstName: string;
+    lastName: string;
+    phone: string;
+}
+
+export const missingBookingFields = (customer: BookingCustomer): string[] => {
+    const missing: string[] = [];
+    if (!customer.firstName?.trim()) missing.push('nombre');
+    if (!customer.lastName?.trim()) missing.push('apellido');
+    if (!customer.phone?.trim()) missing.push('número de teléfono');
+    return missing;
+};
+
 export interface BookingResult {
     success: boolean;
     eventId?: string;
@@ -12,7 +26,7 @@ export interface CalendarService {
     bookAppointment(
         date: string,
         startHour: number,
-        customerName: string,
+        customer: BookingCustomer,
         notes?: string
     ): Promise<BookingResult>;
 }

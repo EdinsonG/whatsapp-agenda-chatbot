@@ -71,8 +71,20 @@ const parseHour = (text: string): number | undefined => {
 };
 
 const parseCustomerName = (text: string): string | undefined => {
-    const m = text.match(/(?:para|a nombre de|de parte de)\s+([a-záéíóúñ\s]+)$/i);
-    return m ? m[1].trim() : undefined;
+    const m = text.match(/(?:para|a nombre de|de parte de)\s+(.+)$/i);
+    if (!m) return undefined;
+    return m[1].replace(/\s*\+?\d[\d\s().-]*$/i, '').trim();
+};
+
+const parsePhone = (text: string): string | undefined => {
+    const t = text
+        .replace(/\d{4}-\d{2}-\d{2}/g, ' ')
+        .replace(/\b\d{1,2}\s*(?:hs\.?|horas)\b/gi, ' ')
+        .replace(/\b\d{1,2}\s*(?:am|pm)\b/gi, ' ');
+    const match = t.match(/(?:\+?\d[\d\s().-]{7,})/);
+    if (!match) return undefined;
+    const digits = match[0].replace(/[^\d+]/g, '');
+    return digits.length >= 7 ? digits : undefined;
 };
 
 const BOOK_WORDS = /(agendar|reservar|pedir|sacar|programar|agenda|reserva|cita|turno)/;
@@ -105,6 +117,7 @@ export const parseCommand = (raw: string, now?: Date): ParsedCommand => {
             date: parseDate(t, now),
             startHour: parseHour(t),
             customerName: parseCustomerName(raw),
+            phone: parsePhone(raw),
         };
     }
 

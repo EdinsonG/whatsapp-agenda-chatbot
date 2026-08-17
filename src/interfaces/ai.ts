@@ -1,7 +1,9 @@
 export interface ScheduleIntent {
     date: string;
     startHour: number;
-    customerName: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
     notes?: string;
 }
 

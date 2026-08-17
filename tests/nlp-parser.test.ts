@@ -85,3 +85,22 @@ describe('parseCommand - nombre del cliente', () => {
         expect(r.customerName).toBeUndefined();
     });
 });
+
+describe('parseCommand - teléfono', () => {
+    it('extrae teléfono al final de la frase y lo excluye del nombre', () => {
+        const r = parseCommand('agenda una cita mañana a las 9 para Ana García 3515551234', NOW);
+        expect(r.customerName).toBe('Ana García');
+        expect(r.phone).toBe('3515551234');
+    });
+
+    it('extrae teléfono con prefijo +, espacios y guiones', () => {
+        const r = parseCommand('agenda una cita para Juan Pérez +54 9 351 555-1234', NOW);
+        expect(r.customerName).toBe('Juan Pérez');
+        expect(r.phone).toBe('+5493515551234');
+    });
+
+    it('no extrae teléfono si no se indica', () => {
+        const r = parseCommand('agenda una cita mañana a las 9 para Ana García', NOW);
+        expect(r.phone).toBeUndefined();
+    });
+});

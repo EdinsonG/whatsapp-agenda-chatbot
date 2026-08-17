@@ -31,7 +31,7 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
         function: {
             name: TOOL_BOOK,
             description:
-                'Agenda (reserva) una cita en el calendario. Úsalo SOLO cuando el usuario haya confirmado día, hora y (idealmente) su nombre.',
+                'Agenda (reserva) una cita en el calendario. Úsalo SOLO cuando el usuario haya confirmado día, hora, nombre, apellido y número de teléfono.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -43,16 +43,24 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
                         type: 'integer',
                         description: 'Hora de inicio en punto (ej. 9 = 09:00). Solo enteros entre openHour y closeHour-1.',
                     },
-                    customerName: {
+                    firstName: {
                         type: 'string',
                         description: 'Nombre del cliente',
+                    },
+                    lastName: {
+                        type: 'string',
+                        description: 'Apellido del cliente',
+                    },
+                    phone: {
+                        type: 'string',
+                        description: 'Número de teléfono del cliente',
                     },
                     notes: {
                         type: 'string',
                         description: 'Notas opcionales de la cita',
                     },
                 },
-                required: ['date', 'startHour', 'customerName'],
+                required: ['date', 'startHour', 'firstName', 'lastName', 'phone'],
             },
         },
     },
@@ -108,7 +116,11 @@ export class GroqConversationService {
                 const result = await this.calendar.bookAppointment(
                     args.date,
                     args.startHour,
-                    args.customerName,
+                    {
+                        firstName: args.firstName,
+                        lastName: args.lastName,
+                        phone: args.phone,
+                    },
                     args.notes
                 );
                 return { name, content: result.message };
@@ -122,7 +134,7 @@ export class GroqConversationService {
                 const list = bookings
                     .map(
                         (b: any) =>
-                            `${b.date} ${String(b.startHour).padStart(2, '0')}:00 - ${b.customerName}`
+                            `${b.date} ${String(b.startHour).padStart(2, '0')}:00 - ${b.customer.firstName} ${b.customer.lastName}`
                     )
                     .join('\n');
                 return { name, content: `Citas agendadas:\n${list}` };

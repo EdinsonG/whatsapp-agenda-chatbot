@@ -1,7 +1,7 @@
 import { google, calendar_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
-import { BookingResult, CalendarService, TenantConfig, TimeSlot } from '../interfaces';
+import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, TenantConfig, TimeSlot } from '../interfaces';
 import {
     getAvailableSlots,
     isSlotAvailable,
@@ -68,9 +68,17 @@ export class GoogleCalendarService implements CalendarService {
     async bookAppointment(
         date: string,
         startHour: number,
-        customerName: string,
+        customer: BookingCustomer,
         notes?: string
     ): Promise<BookingResult> {
+        const missing = missingBookingFields(customer);
+        if (missing.length) {
+            return {
+                success: false,
+                message: `No pude agendar la cita porque falta: ${missing.join(', ')}. Por favor, indicá tu nombre, apellido, hora de cita y número de teléfono.`,
+            };
+        }
+
         const allSlots = generateSlots({
             date,
             openHour: this.config.openHour,
@@ -99,9 +107,10 @@ export class GoogleCalendarService implements CalendarService {
             };
         }
 
+        const customerFullName = `${customer.firstName} ${customer.lastName}`.trim();
         const event = {
-            summary: `${this.config.businessName} - Cita ${customerName}`,
-            description: notes || '',
+            summary: `${this.config.businessName} - Cita ${customerFullName}`,
+            description: [notes, `Teléfono: ${customer.phone}`].filter(Boolean).join('\n'),
             start: { dateTime: candidate.start.toISOString(), timeZone: this.config.timezone },
             end: { dateTime: candidate.end.toISOString(), timeZone: this.config.timezone },
         };
@@ -115,7 +124,7 @@ export class GoogleCalendarService implements CalendarService {
             success: true,
             eventId: created.data.id ?? undefined,
             slot: candidate,
-            message: `Cita confirmada para ${customerName} el ${date} a las ${startHour}:00 (${this.config.appointmentDurationMin} minutos).`,
+            message: `Cita confirmada para ${customerFullName} (tel. ${customer.phone}) el ${date} a las ${startHour}:00 (${this.config.appointmentDurationMin} minutos).`,
         };
     }
 }

@@ -5,5 +5,7 @@ export interface ParsedCommand {
     date?: string;
     startHour?: number;
     customerName?: string;
+    lastName?: string;
+    phone?: string;
     message?: string;
 }

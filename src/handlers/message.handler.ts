@@ -67,7 +67,11 @@ export const handleMessage = async (msg: Message) => {
                 const result = await calendar.bookAppointment(
                     ai.scheduleIntent.date,
                     ai.scheduleIntent.startHour,
-                    ai.scheduleIntent.customerName,
+                    {
+                        firstName: ai.scheduleIntent.firstName,
+                        lastName: ai.scheduleIntent.lastName,
+                        phone: ai.scheduleIntent.phone,
+                    },
                     ai.scheduleIntent.notes
                 );
 

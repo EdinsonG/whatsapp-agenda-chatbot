@@ -13,7 +13,7 @@ const schedulingTools: Groq.Chat.Completions.ChatCompletionTool[] = [
         function: {
             name: SCHEDULE_TOOL_NAME,
             description:
-                'Agenda una cita en el calendario. Úsalo solo cuando el cliente haya confirmado día y hora.',
+                'Agenda una cita en el calendario. Úsalo solo cuando el cliente haya confirmado día, hora, nombre, apellido y número de teléfono.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -25,16 +25,24 @@ const schedulingTools: Groq.Chat.Completions.ChatCompletionTool[] = [
                         type: 'integer',
                         description: 'Hora de inicio en punto (ej. 9 = 09:00). Solo valores enteros.',
                     },
-                    customerName: {
+                    firstName: {
                         type: 'string',
                         description: 'Nombre del cliente',
+                    },
+                    lastName: {
+                        type: 'string',
+                        description: 'Apellido del cliente',
+                    },
+                    phone: {
+                        type: 'string',
+                        description: 'Número de teléfono del cliente',
                     },
                     notes: {
                         type: 'string',
                         description: 'Notas opcionales de la cita',
                     },
                 },
-                required: ['date', 'startHour', 'customerName'],
+                required: ['date', 'startHour', 'firstName', 'lastName', 'phone'],
             },
         },
     },

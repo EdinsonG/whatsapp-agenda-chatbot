@@ -23,16 +23,52 @@ const formatSlot = (slot: { start: Date; end: Date }): string => {
 
 console.log(`\n=== 🤖 ${config.businessName} — Asistente de citas (sin IA) ===`);
 console.log('Calendario SIMULADO. Interpreta frases con reglas locales (sin conexión).\n');
+console.log('Para agendar se solicitan SIEMPRE: nombre, apellido, hora de cita y número de teléfono.\n');
 console.log('Ejemplos:');
 console.log('  "¿Qué horarios tienes mañana?"');
 console.log('  "Quiero agendar una cita para el lunes a las 10"');
-console.log('  "Agenda una cita mañana a las 9 para Ana García"');
+console.log('  "Agenda una cita mañana a las 9 para Ana García 3515551234"');
 console.log('  "lista" / "salir"\n');
 
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
 });
+
+const ask = (question: string): Promise<string> =>
+    new Promise((resolve) => rl.question(question, (answer) => resolve(answer.trim())));
+
+const collectBookingData = async (parsed: ReturnType<typeof parseCommand>) => {
+    let date = parsed.date;
+    let hour = parsed.startHour;
+    let phone = parsed.phone;
+    let firstName: string | undefined;
+    let lastName = parsed.lastName;
+
+    if (parsed.customerName) {
+        const parts = parsed.customerName.split(/\s+/);
+        firstName = parts[0];
+        lastName = parts.slice(1).join(' ') || lastName;
+    }
+
+    if (!date) {
+        date = await ask('   ¿Para qué día te gustaría agendar? (YYYY-MM-DD): ');
+        if (!date) return undefined;
+    }
+    if (hour === undefined) {
+        const slots = await calendar.getAvailableSlotsForDate(date);
+        console.log('   ¿A qué hora? Estos son los bloques que tengo:');
+        slots.forEach((s) => console.log(`     • ${formatSlot(s)}`));
+        const answer = await ask('   Hora (0-23): ');
+        hour = parseInt(answer, 10);
+        if (Number.isNaN(hour)) return undefined;
+    }
+    if (!firstName) firstName = await ask('   Tu nombre: ');
+    if (!lastName) lastName = await ask('   Tu apellido: ');
+    if (!phone) phone = await ask('   Tu número de teléfono: ');
+
+    return { date, hour, customer: { firstName, lastName, phone } };
+};
 
 const respond = (line: string): Promise<boolean> => {
     const input = line.trim();
@@ -48,7 +84,7 @@ const respond = (line: string): Promise<boolean> => {
     switch (parsed.intent) {
         case 'greeting': {
             console.log(`   ¡Hola! Soy el asistente de ${config.businessName}. 😊`);
-            console.log('   ¿Te gustaría agendar una cita? Puedo decirte los horarios disponibles.');
+            console.log('   ¿Te gustaría agendar una cita? Necesito tu nombre, apellido y teléfono para agendar.');
             console.log('');
             return Promise.resolve(true);
         }
@@ -69,28 +105,23 @@ const respond = (line: string): Promise<boolean> => {
         }
 
         case 'book': {
-            const date = parsed.date;
-            const hour = parsed.startHour;
-
-            if (!date) {
-                console.log('   ¿Para qué día te gustaría agendar?');
-                console.log('');
-                return Promise.resolve(true);
-            }
-            if (hour === undefined) {
-                return calendar.getAvailableSlotsForDate(date).then((slots) => {
-                    console.log('   ¿A qué hora? Estos son los bloques que tengo:');
-                    slots.forEach((s) => console.log(`     • ${formatSlot(s)}`));
+            return collectBookingData(parsed).then((booking) => {
+                if (!booking) {
+                    console.log('   No completaste los datos necesarios. Recordá: nombre, apellido, hora de cita y teléfono.');
                     console.log('');
                     return true;
-                });
-            }
-
-            const name = parsed.customerName ?? 'Cliente';
-            return calendar.bookAppointment(date, hour, name).then((result) => {
-                console.log(result.success ? `   ✅ ${result.message}` : `   ❌ ${result.message}`);
-                console.log('');
-                return true;
+                }
+                return calendar
+                    .bookAppointment(booking.date, booking.hour, booking.customer)
+                    .then((result) => {
+                        console.log(
+                            result.success
+                                ? `   ✅ ${result.message}`
+                                : `   ❌ ${result.message}`
+                        );
+                        console.log('');
+                        return true;
+                    });
             });
         }
 
@@ -102,7 +133,7 @@ const respond = (line: string): Promise<boolean> => {
                 console.log('   Tus citas agendadas:');
                 bookings.forEach((b) =>
                     console.log(
-                        `     • ${b.date} ${String(b.startHour).padStart(2, '0')}:00 — ${b.customerName}`
+                        `     • ${b.date} ${String(b.startHour).padStart(2, '0')}:00 — ${b.customer.firstName} ${b.customer.lastName} (${b.customer.phone})`
                     )
                 );
             }
