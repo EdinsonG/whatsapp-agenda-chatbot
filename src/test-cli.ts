@@ -25,7 +25,13 @@ const rl = readline.createInterface({
     output: process.stdout,
 });
 
+let cliClosed = false;
+rl.on('close', () => {
+    cliClosed = true;
+});
+
 const ask = () => {
+    if (cliClosed) return;
     rl.question('Tú: ', async (input) => {
         const text = input.trim();
         if (!text) return ask();
