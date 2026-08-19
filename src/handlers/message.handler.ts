@@ -3,7 +3,8 @@ import { TenantManager } from '../tenants/tenant.manager';
 import { getTenantAIResponse } from '../services/groq.service';
 import { GoogleCalendarService } from '../services/google-calendar.service';
 import { getLimiter, randomDelay } from '../services/limiter.service';
-import { TenantConfig } from '../interfaces';
+import { scheduleAppointmentReminders } from '../services/reminder.scheduler';
+import { Service, servicesTotalDuration, TenantConfig } from '../interfaces';
 
 const tenantManager = new TenantManager();
 
@@ -64,6 +65,14 @@ export const handleMessage = async (msg: Message) => {
             const ai = await getTenantAIResponse(text, config, availableSummary);
 
             if (ai.scheduleIntent) {
+                const serviceIds = ai.scheduleIntent.serviceIds ?? [];
+                const services: Service[] = serviceIds
+                    .map((id) => config.services.find((s) => s.id === id))
+                    .filter((s): s is Service => Boolean(s));
+                const durationMin =
+                    servicesTotalDuration(config.services, serviceIds) ||
+                    config.appointmentDurationMin;
+
                 const result = await calendar.bookAppointment(
                     ai.scheduleIntent.date,
                     ai.scheduleIntent.startHour,
@@ -72,8 +81,25 @@ export const handleMessage = async (msg: Message) => {
                         lastName: ai.scheduleIntent.lastName,
                         phone: ai.scheduleIntent.phone,
                     },
+                    durationMin,
+                    services,
                     ai.scheduleIntent.notes
                 );
+
+                if (result.success) {
+                    await scheduleAppointmentReminders({
+                        chatId: msg.from,
+                        businessName: config.businessName,
+                        date: ai.scheduleIntent.date,
+                        startHour: ai.scheduleIntent.startHour,
+                        customer: {
+                            firstName: ai.scheduleIntent.firstName,
+                            lastName: ai.scheduleIntent.lastName,
+                            phone: ai.scheduleIntent.phone,
+                        },
+                        services,
+                    });
+                }
 
                 await randomDelay(800, 2000);
                 await msg.reply(

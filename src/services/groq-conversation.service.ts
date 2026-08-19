@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk';
-import { CalendarService, TenantConfig, ToolCallResult } from '../interfaces';
+import { CalendarService, Service, servicesTotalDuration, TenantConfig, ToolCallResult } from '../interfaces';
 import { buildSchedulingSystemPrompt } from '../prompts/scheduling.prompt';
 import { env } from '../config/env';
 
@@ -13,7 +13,7 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
         function: {
             name: TOOL_AVAILABLE_SLOTS,
             description:
-                'Consulta los bloques de horario disponibles (libres) para una fecha concreta. Usa esto cuando el usuario pida horarios o disponibilidad, o para confirmar antes de agendar.',
+                'Consulta los bloques de horario disponibles (libres) para una fecha y duración concretas. Usa esto cuando el usuario haya elegido servicio(s) y pida horarios, o para confirmar antes de agendar.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -21,8 +21,13 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
                         type: 'string',
                         description: 'Fecha en formato YYYY-MM-DD (p.ej. 2026-08-17)',
                     },
+                    serviceIds: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'IDs de los servicios elegidos por el cliente (p.ej. ["consulta-general"]).',
+                    },
                 },
-                required: ['date'],
+                required: ['date', 'serviceIds'],
             },
         },
     },
@@ -31,7 +36,7 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
         function: {
             name: TOOL_BOOK,
             description:
-                'Agenda (reserva) una cita en el calendario. Úsalo SOLO cuando el usuario haya confirmado día, hora, nombre, apellido y número de teléfono.',
+                'Agenda (reserva) una cita en el calendario. Úsalo SOLO cuando el usuario haya confirmado día, hora, servicio(s), nombre, apellido y número de teléfono.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -42,6 +47,11 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
                     startHour: {
                         type: 'integer',
                         description: 'Hora de inicio en punto (ej. 9 = 09:00). Solo enteros entre openHour y closeHour-1.',
+                    },
+                    serviceIds: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'IDs de los servicios a agendar (p.ej. ["limpieza-dental", "consulta-general"]).',
                     },
                     firstName: {
                         type: 'string',
@@ -60,7 +70,7 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
                         description: 'Notas opcionales de la cita',
                     },
                 },
-                required: ['date', 'startHour', 'firstName', 'lastName', 'phone'],
+                required: ['date', 'startHour', 'serviceIds', 'firstName', 'lastName', 'phone'],
             },
         },
     },
@@ -77,11 +87,13 @@ export const buildTools = (): Groq.Chat.Completions.ChatCompletionTool[] => [
 export class GroqConversationService {
     private groq: Groq;
     private calendar: CalendarService;
+    private config: TenantConfig;
     private history: Groq.Chat.Completions.ChatCompletionMessageParam[];
 
     constructor(tenant: TenantConfig, calendar: CalendarService) {
         this.groq = new Groq({ apiKey: env.GROQ_API_KEY });
         this.calendar = calendar;
+        this.config = tenant;
         this.history = [
             {
                 role: 'system',
@@ -96,10 +108,21 @@ export class GroqConversationService {
         ];
     }
 
+    private resolveServices(serviceIds: string[] = []): Service[] {
+        return serviceIds
+            .map((id) => this.config.services.find((s) => s.id === id))
+            .filter((s): s is Service => Boolean(s));
+    }
+
     private async runTool(name: string, args: any): Promise<ToolCallResult> {
         switch (name) {
             case TOOL_AVAILABLE_SLOTS: {
-                const slots = await this.calendar.getAvailableSlotsForDate(args.date);
+                const serviceIds = args.serviceIds ?? [];
+                const services = this.resolveServices(serviceIds);
+                const durationMin =
+                    servicesTotalDuration(this.config.services, serviceIds) ||
+                    this.config.appointmentDurationMin;
+                const slots = await this.calendar.getAvailableSlotsForDate(args.date, durationMin);
                 if (!slots.length) {
                     return { name, content: `No hay bloques disponibles para ${args.date}.` };
                 }
@@ -109,10 +132,18 @@ export class GroqConversationService {
                         return `${pad(s.start.getHours())}:${pad(s.start.getMinutes())}-${pad(s.end.getHours())}:${pad(s.end.getMinutes())}`;
                     })
                     .join(', ');
-                return { name, content: `Bloques libres para ${args.date}: ${list}` };
+                const serviceText = services.length
+                    ? ` (${services.map((s) => s.name).join(', ')} — ${durationMin} min)`
+                    : ` (duración ${durationMin} min)`;
+                return { name, content: `Bloques libres para ${args.date}${serviceText}: ${list}` };
             }
 
             case TOOL_BOOK: {
+                const serviceIds = args.serviceIds ?? [];
+                const services = this.resolveServices(serviceIds);
+                const durationMin =
+                    servicesTotalDuration(this.config.services, serviceIds) ||
+                    this.config.appointmentDurationMin;
                 const result = await this.calendar.bookAppointment(
                     args.date,
                     args.startHour,
@@ -121,6 +152,8 @@ export class GroqConversationService {
                         lastName: args.lastName,
                         phone: args.phone,
                     },
+                    durationMin,
+                    services,
                     args.notes
                 );
                 return { name, content: result.message };
@@ -134,7 +167,7 @@ export class GroqConversationService {
                 const list = bookings
                     .map(
                         (b: any) =>
-                            `${b.date} ${String(b.startHour).padStart(2, '0')}:00 - ${b.customer.firstName} ${b.customer.lastName}`
+                            `${b.date} ${String(b.startHour).padStart(2, '0')}:00 - ${b.customer.firstName} ${b.customer.lastName} (${b.services?.map((s: Service) => s.name).join(', ') ?? 'sin servicios'})`
                     )
                     .join('\n');
                 return { name, content: `Citas agendadas:\n${list}` };

@@ -1,7 +1,7 @@
 import { google, calendar_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
-import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, TenantConfig, TimeSlot } from '../interfaces';
+import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, Service, TenantConfig, TimeSlot } from '../interfaces';
 import {
     getAvailableSlots,
     isSlotAvailable,
@@ -50,7 +50,7 @@ export class GoogleCalendarService implements CalendarService {
         );
     }
 
-    async getAvailableSlotsForDate(date: string): Promise<TimeSlot[]> {
+    async getAvailableSlotsForDate(date: string, durationMin?: number): Promise<TimeSlot[]> {
         const busy = await this.getBusySlots(date);
         return getAvailableSlots(
             {
@@ -58,7 +58,7 @@ export class GoogleCalendarService implements CalendarService {
                 openHour: this.config.openHour,
                 closeHour: this.config.closeHour,
                 slotIntervalMin: this.config.slotIntervalMin,
-                appointmentDurationMin: this.config.appointmentDurationMin,
+                appointmentDurationMin: durationMin ?? this.config.appointmentDurationMin,
                 timezone: this.config.timezone,
             },
             busy
@@ -69,6 +69,8 @@ export class GoogleCalendarService implements CalendarService {
         date: string,
         startHour: number,
         customer: BookingCustomer,
+        durationMin?: number,
+        services?: Service[],
         notes?: string
     ): Promise<BookingResult> {
         const missing = missingBookingFields(customer);
@@ -79,12 +81,14 @@ export class GoogleCalendarService implements CalendarService {
             };
         }
 
+        const appointmentDurationMin = durationMin ?? this.config.appointmentDurationMin;
+
         const allSlots = generateSlots({
             date,
             openHour: this.config.openHour,
             closeHour: this.config.closeHour,
             slotIntervalMin: this.config.slotIntervalMin,
-            appointmentDurationMin: this.config.appointmentDurationMin,
+            appointmentDurationMin,
             timezone: this.config.timezone,
         });
 
@@ -93,7 +97,7 @@ export class GoogleCalendarService implements CalendarService {
         if (!candidate) {
             return {
                 success: false,
-                message: `La hora ${startHour}:00 no es un bloque válido para agendar (duración ${this.config.appointmentDurationMin} min, bloques de ${this.config.slotIntervalMin} min).`,
+                message: `La hora ${startHour}:00 no es un bloque válido para agendar (duración ${appointmentDurationMin} min, bloques de ${this.config.slotIntervalMin} min).`,
             };
         }
 
@@ -108,9 +112,12 @@ export class GoogleCalendarService implements CalendarService {
         }
 
         const customerFullName = `${customer.firstName} ${customer.lastName}`.trim();
+        const servicesInfo = services?.length
+            ? `Servicios: ${services.map((s) => `${s.name} ($${s.priceUsd} USD, ${s.durationMin} min)`).join(', ')}`
+            : '';
         const event = {
             summary: `${this.config.businessName} - Cita ${customerFullName}`,
-            description: [notes, `Teléfono: ${customer.phone}`].filter(Boolean).join('\n'),
+            description: [servicesInfo, notes, `Teléfono: ${customer.phone}`].filter(Boolean).join('\n'),
             start: { dateTime: candidate.start.toISOString(), timeZone: this.config.timezone },
             end: { dateTime: candidate.end.toISOString(), timeZone: this.config.timezone },
         };
@@ -120,11 +127,14 @@ export class GoogleCalendarService implements CalendarService {
             requestBody: event,
         });
 
+        const totalPrice = services?.reduce((sum, s) => sum + s.priceUsd, 0);
+        const priceInfo = totalPrice ? ` Total: $${totalPrice} USD.` : '';
+
         return {
             success: true,
             eventId: created.data.id ?? undefined,
             slot: candidate,
-            message: `Cita confirmada para ${customerFullName} (tel. ${customer.phone}) el ${date} a las ${startHour}:00 (${this.config.appointmentDurationMin} minutos).`,
+            message: `Cita confirmada para ${customerFullName} (tel. ${customer.phone}) el ${date} a las ${startHour}:00 (${appointmentDurationMin} minutos).${priceInfo}`,
         };
     }
 }

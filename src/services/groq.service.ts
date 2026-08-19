@@ -13,7 +13,7 @@ const schedulingTools: Groq.Chat.Completions.ChatCompletionTool[] = [
         function: {
             name: SCHEDULE_TOOL_NAME,
             description:
-                'Agenda una cita en el calendario. Úsalo solo cuando el cliente haya confirmado día, hora, nombre, apellido y número de teléfono.',
+                'Agenda una cita en el calendario. Úsalo solo cuando el cliente haya confirmado día, hora, servicio(s), nombre, apellido y número de teléfono.',
             parameters: {
                 type: 'object',
                 properties: {
@@ -24,6 +24,11 @@ const schedulingTools: Groq.Chat.Completions.ChatCompletionTool[] = [
                     startHour: {
                         type: 'integer',
                         description: 'Hora de inicio en punto (ej. 9 = 09:00). Solo valores enteros.',
+                    },
+                    serviceIds: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'IDs de los servicios a agendar (p.ej. ["consulta-general", "limpieza-dental"]).',
                     },
                     firstName: {
                         type: 'string',
@@ -42,7 +47,7 @@ const schedulingTools: Groq.Chat.Completions.ChatCompletionTool[] = [
                         description: 'Notas opcionales de la cita',
                     },
                 },
-                required: ['date', 'startHour', 'firstName', 'lastName', 'phone'],
+                required: ['date', 'startHour', 'serviceIds', 'firstName', 'lastName', 'phone'],
             },
         },
     },
@@ -82,9 +87,13 @@ export const getTenantAIResponse = async (
         if (toolCall && toolCall.function.name === SCHEDULE_TOOL_NAME) {
             try {
                 const args = JSON.parse(toolCall.function.arguments || '{}');
+                const scheduleIntent = args as ScheduleIntent;
+                if (!Array.isArray(scheduleIntent.serviceIds)) {
+                    scheduleIntent.serviceIds = [];
+                }
                 return {
                     content: 'Agendando tu cita...',
-                    scheduleIntent: args as ScheduleIntent,
+                    scheduleIntent,
                 };
             } catch {
                 return {

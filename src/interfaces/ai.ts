@@ -4,6 +4,7 @@ export interface ScheduleIntent {
     firstName: string;
     lastName: string;
     phone: string;
+    serviceIds: string[];
     notes?: string;
 }
 

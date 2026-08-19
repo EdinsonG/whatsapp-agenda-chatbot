@@ -13,6 +13,16 @@ const tenantSchema = z.object({
     slotIntervalMin: z.number().int().positive().default(60),
     appointmentDurationMin: z.number().int().positive().default(45),
     systemPrompt: z.string().optional().default(''),
+    services: z
+        .array(
+            z.object({
+                id: z.string().min(1),
+                name: z.string().min(1),
+                priceUsd: z.number().positive(),
+                durationMin: z.number().int().positive(),
+            })
+        )
+        .min(1),
     calendar: z.object({
         serviceAccountEmail: z.string().min(1),
         calendarId: z.string().min(1),

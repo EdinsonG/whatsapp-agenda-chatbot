@@ -1,4 +1,5 @@
 import { TimeSlot } from './scheduling';
+import { Service } from './tenant';
 
 export interface BookingCustomer {
     firstName: string;
@@ -22,11 +23,13 @@ export interface BookingResult {
 }
 
 export interface CalendarService {
-    getAvailableSlotsForDate(date: string): Promise<TimeSlot[]>;
+    getAvailableSlotsForDate(date: string, durationMin?: number): Promise<TimeSlot[]>;
     bookAppointment(
         date: string,
         startHour: number,
         customer: BookingCustomer,
+        durationMin?: number,
+        services?: Service[],
         notes?: string
     ): Promise<BookingResult>;
 }
