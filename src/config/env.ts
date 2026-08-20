@@ -8,6 +8,7 @@ const envSchema = z.object({
     MODEL_NAME: z.string().min(1).default('llama-3.3-70b-versatile'),
     PORT: z.coerce.number().int().positive().default(3000),
     TENANTS_DIR: z.string().min(1).default('src/tenants/tenants'),
+    DEFAULT_TENANT: z.string().min(1).optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);

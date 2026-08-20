@@ -13,6 +13,7 @@ const tenantSchema = z.object({
     slotIntervalMin: z.number().int().positive().default(60),
     appointmentDurationMin: z.number().int().positive().default(45),
     systemPrompt: z.string().optional().default(''),
+    isDefault: z.boolean().optional().default(false),
     services: z
         .array(
             z.object({
@@ -82,12 +83,19 @@ export class TenantManager {
         return this.tenants.find((t) => t.id === id);
     }
 
+    getDefaultTenant(): Tenant | undefined {
+        const id = env.DEFAULT_TENANT || this.tenants.find((t) => t.config.isDefault)?.id;
+        return id ? this.getById(id) : undefined;
+    }
+
     resolveByWhatsApp(from: string): Tenant | undefined {
         const cleanFrom = from.split('@')[0];
         return (
             this.tenants.find((t) =>
                 (t.config.whatsapp.allowedNumbers ?? []).includes(cleanFrom)
-            ) ?? (this.tenants.length === 1 ? this.tenants[0] : undefined)
+            ) ??
+            this.getDefaultTenant() ??
+            this.tenants[0]
         );
     }
 }

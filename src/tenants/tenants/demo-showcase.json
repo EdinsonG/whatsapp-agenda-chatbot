@@ -1,0 +1,50 @@
+{
+  "id": "demo-showcase",
+  "businessName": "AgendaPro Demo",
+  "timezone": "America/Mexico_City",
+  "openHour": 9,
+  "closeHour": 18,
+  "slotIntervalMin": 60,
+  "appointmentDurationMin": 45,
+  "isDefault": true,
+  "systemPrompt": "Este tenant es una demostración genérica para mostrar la plataforma a posibles clientes o hacer pruebas. Cambiá el nombre, los servicios y los horarios según el negocio real del cliente.",
+  "services": [
+    {
+      "id": "consulta-online",
+      "name": "Consulta / asesoría online",
+      "priceUsd": 30,
+      "durationMin": 30
+    },
+    {
+      "id": "sesion-completa",
+      "name": "Sesión completa",
+      "priceUsd": 50,
+      "durationMin": 60
+    },
+    {
+      "id": "clase-particular",
+      "name": "Clase / taller individual",
+      "priceUsd": 40,
+      "durationMin": 45
+    },
+    {
+      "id": "paquete-mensual",
+      "name": "Paquete mensual",
+      "priceUsd": 180,
+      "durationMin": 120
+    }
+  ],
+  "calendar": {
+    "serviceAccountEmail": "demo-showcase@proyecto-calendar.iam.gserviceaccount.com",
+    "calendarId": "primary",
+    "credentialsPath": "src/tenants/credentials/demo-showcase-service-account.json"
+  },
+  "whatsapp": {
+    "sessionId": "demo-showcase",
+    "allowedNumbers": ["5493515550000"],
+    "rateLimit": {
+      "maxConcurrent": 1,
+      "minTimeMs": 2500
+    }
+  }
+}

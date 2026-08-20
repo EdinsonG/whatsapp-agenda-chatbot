@@ -23,6 +23,7 @@ export interface TenantConfig {
     slotIntervalMin: number;
     appointmentDurationMin: number;
     systemPrompt: string;
+    isDefault?: boolean;
     services: Service[];
     calendar: {
         serviceAccountEmail: string;

@@ -6,7 +6,7 @@ import { appointmentStore } from './services/appointment.store';
 import { Service, servicesTotalDuration } from './interfaces';
 
 const tenantManager = new TenantManager();
-const tenant = tenantManager.getAll()[0];
+const tenant = tenantManager.getDefaultTenant() ?? tenantManager.getAll()[0];
 
 if (!tenant) {
     console.error('❌ No hay tenants configurados en src/tenants/tenants/.');

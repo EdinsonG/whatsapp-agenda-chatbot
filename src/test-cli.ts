@@ -4,7 +4,7 @@ import { MockCalendarService } from './services/mock-calendar.service';
 import { GroqConversationService } from './services/groq-conversation.service';
 
 const tenantManager = new TenantManager();
-const tenant = tenantManager.getAll()[0];
+const tenant = tenantManager.getDefaultTenant() ?? tenantManager.getAll()[0];
 
 if (!tenant) {
     console.error('❌ No hay tenants configurados en src/tenants/tenants/.');

@@ -1,0 +1,60 @@
+{
+  "id": "demo-barberia",
+  "businessName": "Barbería El Clásico",
+  "timezone": "America/Mexico_City",
+  "openHour": 10,
+  "closeHour": 20,
+  "slotIntervalMin": 60,
+  "appointmentDurationMin": 30,
+  "systemPrompt": "Contexto extra de la barbería: especialistas en cortes clásicos y modernos, fades y arreglo de barba. Atención con turno previo por WhatsApp.",
+  "services": [
+    {
+      "id": "corte-cabello",
+      "name": "Corte de cabello",
+      "priceUsd": 15,
+      "durationMin": 30
+    },
+    {
+      "id": "corte-barba",
+      "name": "Corte + barba",
+      "priceUsd": 20,
+      "durationMin": 45
+    },
+    {
+      "id": "arreglo-barba",
+      "name": "Arreglo de barba",
+      "priceUsd": 10,
+      "durationMin": 20
+    },
+    {
+      "id": "tinte",
+      "name": "Tinte / cambio de color",
+      "priceUsd": 40,
+      "durationMin": 60
+    },
+    {
+      "id": "tratamiento-capilar",
+      "name": "Tratamiento capilar",
+      "priceUsd": 35,
+      "durationMin": 50
+    },
+    {
+      "id": "cejas",
+      "name": "Diseño de cejas",
+      "priceUsd": 8,
+      "durationMin": 15
+    }
+  ],
+  "calendar": {
+    "serviceAccountEmail": "demo-barberia@proyecto-calendar.iam.gserviceaccount.com",
+    "calendarId": "primary",
+    "credentialsPath": "src/tenants/credentials/demo-barberia-service-account.json"
+  },
+  "whatsapp": {
+    "sessionId": "demo-barberia",
+    "rateLimit": {
+      "maxConcurrent": 1,
+      "minTimeMs": 2500
+    }
+  }
+}
