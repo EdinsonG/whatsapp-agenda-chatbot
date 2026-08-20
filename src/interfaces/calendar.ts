@@ -18,8 +18,22 @@ export const missingBookingFields = (customer: BookingCustomer): string[] => {
 export interface BookingResult {
     success: boolean;
     eventId?: string;
+    citaNumber?: string;
     message: string;
     slot?: TimeSlot;
+}
+
+export interface StoredBooking {
+    citaNumber: string;
+    chatId: string;
+    phone: string;
+    customer: BookingCustomer;
+    eventId?: string;
+    date: string;
+    startHour: number;
+    durationMin: number;
+    services: Service[];
+    createdAt: Date;
 }
 
 export interface CalendarService {
@@ -31,5 +45,13 @@ export interface CalendarService {
         durationMin?: number,
         services?: Service[],
         notes?: string
+    ): Promise<BookingResult>;
+    cancelAppointment(eventId: string): Promise<boolean>;
+    rescheduleAppointment(
+        eventId: string,
+        newDate: string,
+        newStartHour: number,
+        durationMin?: number,
+        services?: Service[]
     ): Promise<BookingResult>;
 }

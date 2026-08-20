@@ -4,6 +4,8 @@ import { getTenantAIResponse } from '../services/groq.service';
 import { GoogleCalendarService } from '../services/google-calendar.service';
 import { getLimiter, randomDelay } from '../services/limiter.service';
 import { scheduleAppointmentReminders } from '../services/reminder.scheduler';
+import { appointmentStore } from '../services/appointment.store';
+import { handleSelfServiceMessage } from './selfservice.handler';
 import { Service, servicesTotalDuration, TenantConfig } from '../interfaces';
 
 const tenantManager = new TenantManager();
@@ -55,6 +57,10 @@ export const handleMessage = async (msg: Message) => {
             await chat.sendStateTyping();
 
             const calendar = getCalendar(config);
+
+            const selfServiced = await handleSelfServiceMessage(msg, config, calendar);
+            if (selfServiced) return;
+
             let availableSummary: string[] = [];
             try {
                 availableSummary = await getTodayAvailableSummary(calendar, config);
@@ -87,6 +93,23 @@ export const handleMessage = async (msg: Message) => {
                 );
 
                 if (result.success) {
+                    appointmentStore.add({
+                        citaNumber: result.citaNumber ?? `C-${Date.now().toString(36).toUpperCase()}`,
+                        chatId: msg.from,
+                        phone: ai.scheduleIntent.phone,
+                        customer: {
+                            firstName: ai.scheduleIntent.firstName,
+                            lastName: ai.scheduleIntent.lastName,
+                            phone: ai.scheduleIntent.phone,
+                        },
+                        eventId: result.eventId,
+                        date: ai.scheduleIntent.date,
+                        startHour: ai.scheduleIntent.startHour,
+                        durationMin,
+                        services,
+                        createdAt: new Date(),
+                    });
+
                     await scheduleAppointmentReminders({
                         chatId: msg.from,
                         businessName: config.businessName,

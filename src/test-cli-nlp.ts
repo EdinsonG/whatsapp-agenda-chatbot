@@ -2,6 +2,7 @@ import readline from 'readline';
 import { TenantManager } from './tenants/tenant.manager';
 import { MockCalendarService } from './services/mock-calendar.service';
 import { parseCommand } from './core/nlp/nlp-parser';
+import { appointmentStore } from './services/appointment.store';
 import { Service, servicesTotalDuration } from './interfaces';
 
 const tenantManager = new TenantManager();
@@ -165,6 +166,20 @@ const respond = (line: string): Promise<boolean> => {
                 return calendar
                     .bookAppointment(date, hour, customer, durationMin, services)
                     .then((result) => {
+                        if (result.success && result.citaNumber) {
+                            appointmentStore.add({
+                                citaNumber: result.citaNumber,
+                                chatId: '5493515551234@c.us',
+                                phone: customer.phone,
+                                customer,
+                                eventId: result.eventId,
+                                date,
+                                startHour: hour,
+                                durationMin,
+                                services,
+                                createdAt: new Date(),
+                            });
+                        }
                         console.log(
                             result.success
                                 ? `   ✅ ${result.message}`

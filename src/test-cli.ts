@@ -13,7 +13,7 @@ if (!tenant) {
 
 const { config } = tenant;
 const calendar = new MockCalendarService(config);
-const ai = new GroqConversationService(config, calendar);
+const ai = new GroqConversationService(config, calendar, '5493515551234@c.us');
 
 console.log(`\n=== 🤖 ${config.businessName} — Asistente de citas (IA) ===`);
 console.log(`Tenant: ${tenant.id} | Modelo: ${process.env.MODEL_NAME || 'default'}`);

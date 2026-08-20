@@ -2,6 +2,7 @@ import { google, calendar_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, Service, TenantConfig, TimeSlot } from '../interfaces';
+import { generateCitaNumber } from './appointment.store';
 import {
     getAvailableSlots,
     isSlotAvailable,
@@ -112,12 +113,16 @@ export class GoogleCalendarService implements CalendarService {
         }
 
         const customerFullName = `${customer.firstName} ${customer.lastName}`.trim();
+        const citaNumber = generateCitaNumber();
         const servicesInfo = services?.length
             ? `Servicios: ${services.map((s) => `${s.name} ($${s.priceUsd} USD, ${s.durationMin} min)`).join(', ')}`
             : '';
+        const durationInfo = `Duración total: ${appointmentDurationMin} minutos`;
         const event = {
             summary: `${this.config.businessName} - Cita ${customerFullName}`,
-            description: [servicesInfo, notes, `Teléfono: ${customer.phone}`].filter(Boolean).join('\n'),
+            description: [`Cita N°: ${citaNumber}`, servicesInfo, durationInfo, notes, `Teléfono: ${customer.phone}`]
+                .filter(Boolean)
+                .join('\n'),
             start: { dateTime: candidate.start.toISOString(), timeZone: this.config.timezone },
             end: { dateTime: candidate.end.toISOString(), timeZone: this.config.timezone },
         };
@@ -133,8 +138,76 @@ export class GoogleCalendarService implements CalendarService {
         return {
             success: true,
             eventId: created.data.id ?? undefined,
+            citaNumber,
             slot: candidate,
-            message: `Cita confirmada para ${customerFullName} (tel. ${customer.phone}) el ${date} a las ${startHour}:00 (${appointmentDurationMin} minutos).${priceInfo}`,
+            message: `Cita confirmada para ${customerFullName} (tel. ${customer.phone}) el ${date} a las ${startHour}:00 (${appointmentDurationMin} minutos). Tu número de cita es ${citaNumber}.${priceInfo}`,
+        };
+    }
+
+    async cancelAppointment(eventId: string): Promise<boolean> {
+        if (!eventId) return false;
+        await this.calendar.events.delete({
+            calendarId: this.config.calendar.calendarId,
+            eventId,
+        });
+        return true;
+    }
+
+    async rescheduleAppointment(
+        eventId: string,
+        newDate: string,
+        newStartHour: number,
+        durationMin?: number,
+        services?: Service[]
+    ): Promise<BookingResult> {
+        if (!eventId) {
+            return { success: false, message: 'No encontré el evento a reagendar.' };
+        }
+
+        const appointmentDurationMin = durationMin ?? this.config.appointmentDurationMin;
+
+        const allSlots = generateSlots({
+            date: newDate,
+            openHour: this.config.openHour,
+            closeHour: this.config.closeHour,
+            slotIntervalMin: this.config.slotIntervalMin,
+            appointmentDurationMin,
+            timezone: this.config.timezone,
+        });
+
+        const candidate = allSlots.find((s) => s.start.getHours() === newStartHour);
+
+        if (!candidate) {
+            return {
+                success: false,
+                message: `La hora ${newStartHour}:00 no es un bloque válido para reagendar (duración ${appointmentDurationMin} min, bloques de ${this.config.slotIntervalMin} min).`,
+            };
+        }
+
+        const busy = await this.getBusySlots(newDate);
+
+        if (!isSlotAvailable(candidate, busy)) {
+            return {
+                success: false,
+                message: `Lo siento, el bloque de las ${newStartHour}:00 del ${newDate} ya está ocupado.`,
+                slot: candidate,
+            };
+        }
+
+        const updated = await this.calendar.events.patch({
+            calendarId: this.config.calendar.calendarId,
+            eventId,
+            requestBody: {
+                start: { dateTime: candidate.start.toISOString(), timeZone: this.config.timezone },
+                end: { dateTime: candidate.end.toISOString(), timeZone: this.config.timezone },
+            },
+        });
+
+        return {
+            success: true,
+            eventId: updated.data.id ?? eventId,
+            slot: candidate,
+            message: `Cita reagendada para el ${newDate} a las ${newStartHour}:00 (${appointmentDurationMin} minutos).`,
         };
     }
 }
