@@ -1,4 +1,5 @@
 import { BookingCustomer, Service } from '../interfaces';
+import { appointmentStore } from './appointment.store';
 
 export const REMINDER_LEAD_HOURS = [12, 2] as const;
 
@@ -102,4 +103,28 @@ export const cancelAppointmentReminders = (
 export const clearAllReminders = (): void => {
     for (const timer of timers.values()) clearTimeout(timer);
     timers.clear();
+};
+
+export const restoreRemindersFromStore = async (): Promise<void> => {
+    const now = Date.now();
+    let restored = 0;
+
+    for (const booking of appointmentStore.all()) {
+        const at = appointmentAt(booking.date, booking.startHour);
+        if (at.getTime() <= now) continue;
+
+        await scheduleAppointmentReminders({
+            chatId: booking.chatId,
+            businessName: booking.businessName,
+            date: booking.date,
+            startHour: booking.startHour,
+            customer: booking.customer,
+            services: booking.services,
+        });
+        restored++;
+    }
+
+    if (restored > 0) {
+        console.log(`⏰ Recordatorios reprogramados desde el store: ${restored} cita(s).`);
+    }
 };

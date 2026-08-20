@@ -97,6 +97,7 @@ export const handleMessage = async (msg: Message) => {
                         citaNumber: result.citaNumber ?? `C-${Date.now().toString(36).toUpperCase()}`,
                         chatId: msg.from,
                         phone: ai.scheduleIntent.phone,
+                        businessName: config.businessName,
                         customer: {
                             firstName: ai.scheduleIntent.firstName,
                             lastName: ai.scheduleIntent.lastName,

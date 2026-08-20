@@ -223,6 +223,7 @@ export class GroqConversationService {
                         citaNumber: result.citaNumber,
                         chatId: this.chatId,
                         phone: args.phone,
+                        businessName: this.config.businessName,
                         customer: {
                             firstName: args.firstName,
                             lastName: args.lastName,

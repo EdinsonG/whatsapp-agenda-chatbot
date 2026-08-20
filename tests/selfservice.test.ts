@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { TenantConfig } from '../src/interfaces';
 import { MockCalendarService } from '../src/services/mock-calendar.service';
 import {
@@ -112,20 +115,21 @@ describe('rescheduleAppointment', () => {
     });
 });
 
-describe('AppointmentStore', () => {
-    const makeBooking = (citaNumber: string, chatId: string, phone: string) => ({
-        citaNumber,
-        chatId,
-        phone,
-        customer,
-        eventId: 'mock-1',
-        date: '2026-08-20',
-        startHour: 10,
-        durationMin: 45,
-        services: config.services,
-        createdAt: new Date(),
-    });
+const makeBooking = (citaNumber: string, chatId: string, phone: string) => ({
+    citaNumber,
+    chatId,
+    phone,
+    businessName: 'Clínica Dental Sonrisa',
+    customer,
+    eventId: 'mock-1',
+    date: '2026-08-20',
+    startHour: 10,
+    durationMin: 45,
+    services: config.services,
+    createdAt: new Date(),
+});
 
+describe('AppointmentStore', () => {
     it('encuentra por número de cita sin importar mayúsculas o espacios', () => {
         const store = new AppointmentStore();
         store.add(makeBooking('C-ABC123', '549@c.us', '3515551234'));
@@ -156,6 +160,40 @@ describe('normalización de teléfono', () => {
         expect(phonesMatch('5493515551234@c.us', '5493515551234')).toBe(true);
         expect(phonesMatch('+54-9-351-555-1234', '5493515551234')).toBe(true);
         expect(phonesMatch('5493515551234@c.us', '1122334455')).toBe(false);
+    });
+});
+
+describe('persistencia del store', () => {
+    const tempFile = path.join(
+        os.tmpdir(),
+        `appointments-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`
+    );
+
+    it('guarda en disco y recarga las reservas al volver a instanciar', () => {
+        const store = new AppointmentStore(tempFile);
+        store.add(makeBooking('C-PERSIST', '549@c.us', '3515551234'));
+        expect(fs.existsSync(tempFile)).toBe(true);
+
+        const reloaded = new AppointmentStore(tempFile);
+        const booking = reloaded.findByNumber('c-persist');
+        expect(booking).toBeDefined();
+        expect(booking?.businessName).toBe('Clínica Dental Sonrisa');
+        expect(booking?.customer.firstName).toBe('Ana');
+        expect(booking?.createdAt).toBeInstanceOf(Date);
+
+        fs.rmSync(tempFile, { force: true });
+    });
+
+    it('persiste las actualizaciones y remociones', () => {
+        const store = new AppointmentStore(tempFile);
+        store.add(makeBooking('C-UPDATE', '549@c.us', '3515551234'));
+        store.update('C-UPDATE', { date: '2026-09-01', startHour: 11 });
+        store.remove('C-UPDATE');
+
+        const reloaded = new AppointmentStore(tempFile);
+        expect(reloaded.findByNumber('C-UPDATE')).toBeUndefined();
+
+        fs.rmSync(tempFile, { force: true });
     });
 });
 

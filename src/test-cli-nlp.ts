@@ -171,6 +171,7 @@ const respond = (line: string): Promise<boolean> => {
                                 citaNumber: result.citaNumber,
                                 chatId: '5493515551234@c.us',
                                 phone: customer.phone,
+                                businessName: config.businessName,
                                 customer,
                                 eventId: result.eventId,
                                 date,

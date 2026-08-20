@@ -27,6 +27,7 @@ export interface StoredBooking {
     citaNumber: string;
     chatId: string;
     phone: string;
+    businessName: string;
     customer: BookingCustomer;
     eventId?: string;
     date: string;
