@@ -14,6 +14,14 @@ export const servicesTotalDuration = (
         return service ? total + service.durationMin : total;
     }, 0);
 
+export interface TenantLocation {
+    address?: string;
+    googleMapsUrl?: string;
+    city?: string;
+    region?: string;
+    country?: string;
+}
+
 export interface TenantConfig {
     id: string;
     businessName: string;
@@ -22,6 +30,9 @@ export interface TenantConfig {
     closeHour: number;
     slotIntervalMin: number;
     appointmentDurationMin: number;
+    businessDescription?: string;
+    businessHours?: string;
+    location?: TenantLocation;
     systemPrompt: string;
     isDefault?: boolean;
     services: Service[];

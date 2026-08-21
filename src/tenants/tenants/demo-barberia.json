@@ -6,6 +6,15 @@
   "closeHour": 20,
   "slotIntervalMin": 60,
   "appointmentDurationMin": 30,
+  "businessDescription": "Barbería de estilo clásico y moderno especializada en cortes, fades, perfilado y cuidado de barba, ideal para clientes que buscan una atención premium y personalizada.",
+  "businessHours": "Lunes a sábado de 10:00 a 20:00; domingo cerrado.",
+  "location": {
+    "address": "Calle Morelos 88, Roma Sur, Ciudad de México",
+    "googleMapsUrl": "https://maps.google.com/?q=Calle+Morelos+88+Roma+Sur+Ciudad+de+Mexico",
+    "city": "Ciudad de México",
+    "region": "CDMX",
+    "country": "Mexico"
+  },
   "systemPrompt": "Contexto extra de la barbería: especialistas en cortes clásicos y modernos, fades y arreglo de barba. Atención con turno previo por WhatsApp.",
   "services": [
     {

@@ -12,6 +12,17 @@ const tenantSchema = z.object({
     closeHour: z.number().int().min(0).max(24),
     slotIntervalMin: z.number().int().positive().default(60),
     appointmentDurationMin: z.number().int().positive().default(45),
+    businessDescription: z.string().optional(),
+    businessHours: z.string().optional(),
+    location: z
+        .object({
+            address: z.string().optional(),
+            googleMapsUrl: z.string().url().optional(),
+            city: z.string().optional(),
+            region: z.string().optional(),
+            country: z.string().optional(),
+        })
+        .optional(),
     systemPrompt: z.string().optional().default(''),
     isDefault: z.boolean().optional().default(false),
     services: z

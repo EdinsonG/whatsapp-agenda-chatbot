@@ -6,6 +6,15 @@
   "closeHour": 18,
   "slotIntervalMin": 60,
   "appointmentDurationMin": 45,
+  "businessDescription": "Clínica especializada en odontología general, estética y preventiva con atención personalizada para familias y adultos mayores.",
+  "businessHours": "Lunes a viernes de 08:00 a 18:00; sábados de 09:00 a 14:00.",
+  "location": {
+    "address": "Av. Reforma 245, Colonia Centro, Guadalajara, Jalisco",
+    "googleMapsUrl": "https://maps.google.com/?q=Av.+Reforma+245+Guadalajara+Jalisco",
+    "city": "Guadalajara",
+    "region": "Jalisco",
+    "country": "Mexico"
+  },
   "systemPrompt": "Agrega aquí contexto extra específico de la clínica: especialidades, doctores, sucursales, promociones...",
   "services": [
     {

@@ -6,6 +6,15 @@
   "closeHour": 18,
   "slotIntervalMin": 60,
   "appointmentDurationMin": 45,
+  "businessDescription": "Demostración de una agencia de servicios con atención personalizada para asesorías, sesiones y reservas de agenda para clientes profesionales y emprendedores.",
+  "businessHours": "Lunes a viernes de 09:00 a 18:00.",
+  "location": {
+    "address": "Paseo de la Reforma 100, Juárez, Ciudad de México",
+    "googleMapsUrl": "https://maps.google.com/?q=Paseo+de+la+Reforma+100+Juarez+Ciudad+de+Mexico",
+    "city": "Ciudad de México",
+    "region": "CDMX",
+    "country": "Mexico"
+  },
   "isDefault": true,
   "systemPrompt": "Este tenant es una demostración genérica para mostrar la plataforma a posibles clientes o hacer pruebas. Cambiá el nombre, los servicios y los horarios según el negocio real del cliente.",
   "services": [

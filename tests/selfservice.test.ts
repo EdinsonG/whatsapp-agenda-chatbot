@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { TenantConfig } from '../src/interfaces';
+import { buildSchedulingSystemPrompt } from '../src/prompts/scheduling.prompt';
 import { MockCalendarService } from '../src/services/mock-calendar.service';
 import {
     AppointmentStore,
@@ -19,6 +20,12 @@ const config: TenantConfig = {
     closeHour: 18,
     slotIntervalMin: 60,
     appointmentDurationMin: 45,
+    businessDescription: 'Clínica especializada en odontología general, estética y preventiva.',
+    businessHours: 'Lunes a viernes de 08:00 a 18:00; sábados de 09:00 a 14:00.',
+    location: {
+        address: 'Av. Reforma 245, Colonia Centro, Guadalajara, Jalisco',
+        googleMapsUrl: 'https://maps.google.com/?q=Av.+Reforma+245+Guadalajara+Jalisco',
+    },
     services: [
         { id: 'limpieza-dental', name: 'Limpieza dental', priceUsd: 50, durationMin: 45 },
     ],
@@ -29,6 +36,18 @@ const config: TenantConfig = {
     },
     whatsapp: { sessionId: 'test', rateLimit: { maxConcurrent: 1, minTimeMs: 0 } },
 };
+
+describe('buildSchedulingSystemPrompt', () => {
+    it('usa la información del tenant para horario, descripción y ubicación', () => {
+        const prompt = buildSchedulingSystemPrompt(config);
+
+        expect(prompt).toContain('Clínica especializada en odontología general');
+        expect(prompt).toContain('Lunes a viernes de 08:00 a 18:00');
+        expect(prompt).toContain('Av. Reforma 245');
+        expect(prompt).toContain('maps.google.com');
+        expect(prompt).not.toContain('de lunes a viernes');
+    });
+});
 
 const customer = { firstName: 'Ana', lastName: 'García', phone: '3515551234' };
 
