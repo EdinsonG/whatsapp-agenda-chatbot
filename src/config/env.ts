@@ -4,8 +4,8 @@ import { z } from 'zod';
 dotenv.config();
 
 const envSchema = z.object({
-    GROQ_API_KEY: z.string().min(1, 'GROQ_API_KEY es obligatoria'),
-    MODEL_NAME: z.string().min(1).default('llama-3.3-70b-versatile'),
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional().default(''),
+    MODEL_NAME: z.string().min(1).default('gemma-4-26b-a4b-it'),
     PORT: z.coerce.number().int().positive().default(3000),
     TENANTS_DIR: z.string().min(1).default('src/tenants/tenants'),
     DEFAULT_TENANT: z.string().min(1).optional().default(''),

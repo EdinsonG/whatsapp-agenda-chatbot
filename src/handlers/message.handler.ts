@@ -1,6 +1,6 @@
 import { Message } from 'whatsapp-web.js';
 import { TenantManager } from '../tenants/tenant.manager';
-import { getTenantAIResponse } from '../services/groq.service';
+import { getTenantAIResponse } from '../services/google.service';
 import { GoogleCalendarService } from '../services/google-calendar.service';
 import { getLimiter, randomDelay } from '../services/limiter.service';
 import { scheduleAppointmentReminders } from '../services/reminder.scheduler';

@@ -1,6 +1,6 @@
 # WhatsApp Scheduling Bot 🤖📅
 
-Chatbot de **WhatsApp multitenant** impulsado por IA (Groq / Llama 3.3) para la **gestión y agendamiento automático de citas en Google Calendar**.
+Chatbot de **WhatsApp multitenant** impulsado por IA (Google Gemma 4 / Gemini vía Vercel AI SDK) para la **gestión y agendamiento automático de citas en Google Calendar**.
 
 Soporta **múltiples negocios/clients** (tenants) con configuración aislada: horarios, prompt de contexto, credenciales de Google Calendar y sesiones de WhatsApp, **sin tocar el código base**.
 
@@ -30,10 +30,11 @@ cp .env.example .env   # y edítalo con tus valores
 
 | Variable | Descripción | Ejemplo |
 | :--- | :--- | :--- |
-| `GROQ_API_KEY` | API key de Groq Cloud | `gsk_...` |
-| `MODEL_NAME` | Modelo de Groq a usar | `llama-3.3-70b-versatile` |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | API key de Google AI Studio (Gemma 4 / Gemini) | `AIza...` |
+| `MODEL_NAME` | Modelo a usar | `gemini-3.6-flash` |
 | `PORT` | Puerto del healthcheck | `3000` |
 | `TENANTS_DIR` | Carpeta con los JSON de tenants | `src/tenants/tenants` |
+| `DEFAULT_TENANT` | Tenant por defecto para números no asignados | `demo-showcase` |
 
 > Los datos **por cliente** no van en `.env`: se definen en el JSON de cada tenant.
 
@@ -56,7 +57,11 @@ src/
 │   ├── tenants/*.json           # Configuración por cliente
 │   └── credentials/*.json       # Service Account por cliente (gitignored)
 ├── services/
-│   ├── groq.service.ts          # Integración IA (tool calling de agendamiento)
+│   ├── google.service.ts          # Integración IA (Gemini + tool calling de agendamiento)
+│   ├── google-conversation.service.ts # Conversación multi-turno con herramientas
+│   ├── google-ai.model.ts         # Cliente compartido del modelo (@ai-sdk/google)
+│   ├── appointment.store.ts       # Store persistente de citas (número C-XXXXXX)
+│   ├── reminder.scheduler.ts      # Recordatorios 12h/2h antes de la cita
 │   ├── google-calendar.service.ts # Disponibilidad + creación de eventos
 │   └── limiter.service.ts       # Rate limiter (bottleneck) por tenant
 ├── handlers/
@@ -83,8 +88,7 @@ pnpm run dev        # Desarrollo (nodemon + ts-node)
 pnpm run build      # Compila a /dist
 pnpm start          # Producción
 pnpm test           # Corre las pruebas unitarias (Vitest)
-pnpm cli            # Prueba conversacional con IA (Groq)
-pnpm cli:nlp        # Prueba conversacional sin IA (parser local)
+pnpm cli            # Prueba conversacional con IA (Gemini)
 ```
 
 Al iniciar por primera vez, escanea el **código QR** que aparece en la terminal con tu WhatsApp.
@@ -140,15 +144,13 @@ pnpm test
 
 ## 💬 Probar sin WhatsApp (`pnpm cli`)
 
-Hay **dos modos** para probar el flujo de agendamiento **sin WhatsApp ni Google Calendar** (ambos usan un calendario simulado en memoria):
-
-### Modo con IA (Groq) — `pnpm cli`
+Modo de prueba del flujo de agendamiento **sin WhatsApp ni Google Calendar** (usa un calendario simulado en memoria):
 
 ```
 pnpm cli
 ```
 
-Groq interpreta la conversación natural y ejecuta herramientas (consultar disponibilidad, agendar, listar) contra el calendario simulado.
+Gemini interpreta la conversación natural y ejecuta herramientas (consultar disponibilidad, agendar, cancelar, reagendar, listar) contra el calendario simulado.
 
 ```
 ¿qué horarios tienes mañana?   → la IA consulta get_available_slots
@@ -156,17 +158,7 @@ quiero una cita el lunes a las 10 para Ana   → la IA agenda
 lista                          → la IA lista las citas
 ```
 
-> ⚠️ Requiere una `GROQ_API_KEY` **válida** en tu `.env`. Si da `403`, genera una nueva en https://console.groq.com/keys y actualiza tu `.env`.
-
-### Modo sin IA (parser local) — `pnpm cli:nlp`
-
-```
-pnpm cli:nlp
-```
-
-Interpreta frases con reglas locales (sin conexión ni key): hoy/mañana/día de la semana, horas en punto, nombre tras "para". Útil si aún no tienes key de Groq.
-
-Cubren la lógica de negocio pura (sin red): generación de franjas de 45m/1h, validación de horario 08:00–18:00 y detección de solapamientos.
+> ⚠️ Requiere una `GOOGLE_GENERATIVE_AI_API_KEY` **válida** en tu `.env`. Genera una en https://aistudio.google.com/apikey y actualiza tu `.env`.
 
 ---
 
