@@ -5,6 +5,9 @@ node_modules/
 dist/
 npm-debug.log*
 
+# Datos locales del bot (store de citas persistido)
+data/
+
 # Artefactos de build de tests (vitest en modo CommonJS)
 *.test.js
 vitest.config.js

@@ -1,16 +1,13 @@
 import { google, calendar_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
-import { TenantConfig } from '../tenants/types';
+import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, Service, TenantConfig, TimeSlot } from '../interfaces';
+import { generateCitaNumber } from './appointment.store';
 import {
     getAvailableSlots,
     isSlotAvailable,
-    TimeSlot,
     generateSlots,
 } from '../core/scheduling/scheduling.rules';
-import { BookingResult, CalendarService } from './calendar.interface';
-
-export { BookingResult } from './calendar.interface';
 
 export class GoogleCalendarService implements CalendarService {
     private calendar: calendar_v3.Calendar;
@@ -54,7 +51,7 @@ export class GoogleCalendarService implements CalendarService {
         );
     }
 
-    async getAvailableSlotsForDate(date: string): Promise<TimeSlot[]> {
+    async getAvailableSlotsForDate(date: string, durationMin?: number): Promise<TimeSlot[]> {
         const busy = await this.getBusySlots(date);
         return getAvailableSlots(
             {
@@ -62,7 +59,7 @@ export class GoogleCalendarService implements CalendarService {
                 openHour: this.config.openHour,
                 closeHour: this.config.closeHour,
                 slotIntervalMin: this.config.slotIntervalMin,
-                appointmentDurationMin: this.config.appointmentDurationMin,
+                appointmentDurationMin: durationMin ?? this.config.appointmentDurationMin,
                 timezone: this.config.timezone,
             },
             busy
@@ -72,15 +69,27 @@ export class GoogleCalendarService implements CalendarService {
     async bookAppointment(
         date: string,
         startHour: number,
-        customerName: string,
+        customer: BookingCustomer,
+        durationMin?: number,
+        services?: Service[],
         notes?: string
     ): Promise<BookingResult> {
+        const missing = missingBookingFields(customer);
+        if (missing.length) {
+            return {
+                success: false,
+                message: `No pude agendar la cita porque falta: ${missing.join(', ')}. Por favor, indicá tu nombre, apellido, hora de cita y número de teléfono.`,
+            };
+        }
+
+        const appointmentDurationMin = durationMin ?? this.config.appointmentDurationMin;
+
         const allSlots = generateSlots({
             date,
             openHour: this.config.openHour,
             closeHour: this.config.closeHour,
             slotIntervalMin: this.config.slotIntervalMin,
-            appointmentDurationMin: this.config.appointmentDurationMin,
+            appointmentDurationMin,
             timezone: this.config.timezone,
         });
 
@@ -89,7 +98,7 @@ export class GoogleCalendarService implements CalendarService {
         if (!candidate) {
             return {
                 success: false,
-                message: `La hora ${startHour}:00 no es un bloque válido para agendar (duración ${this.config.appointmentDurationMin} min, bloques de ${this.config.slotIntervalMin} min).`,
+                message: `La hora ${startHour}:00 no es un bloque válido para agendar (duración ${appointmentDurationMin} min, bloques de ${this.config.slotIntervalMin} min).`,
             };
         }
 
@@ -103,9 +112,17 @@ export class GoogleCalendarService implements CalendarService {
             };
         }
 
+        const customerFullName = `${customer.firstName} ${customer.lastName}`.trim();
+        const citaNumber = generateCitaNumber();
+        const servicesInfo = services?.length
+            ? `Servicios: ${services.map((s) => `${s.name} ($${s.priceUsd} USD, ${s.durationMin} min)`).join(', ')}`
+            : '';
+        const durationInfo = `Duración total: ${appointmentDurationMin} minutos`;
         const event = {
-            summary: `${this.config.businessName} - Cita ${customerName}`,
-            description: notes || '',
+            summary: `${this.config.businessName} - Cita ${customerFullName}`,
+            description: [`Cita N°: ${citaNumber}`, servicesInfo, durationInfo, notes, `Teléfono: ${customer.phone}`]
+                .filter(Boolean)
+                .join('\n'),
             start: { dateTime: candidate.start.toISOString(), timeZone: this.config.timezone },
             end: { dateTime: candidate.end.toISOString(), timeZone: this.config.timezone },
         };
@@ -115,11 +132,82 @@ export class GoogleCalendarService implements CalendarService {
             requestBody: event,
         });
 
+        const totalPrice = services?.reduce((sum, s) => sum + s.priceUsd, 0);
+        const priceInfo = totalPrice ? ` Total: $${totalPrice} USD.` : '';
+
         return {
             success: true,
             eventId: created.data.id ?? undefined,
+            citaNumber,
             slot: candidate,
-            message: `Cita confirmada para ${customerName} el ${date} a las ${startHour}:00 (${this.config.appointmentDurationMin} minutos).`,
+            message: `Cita confirmada para ${customerFullName} (tel. ${customer.phone}) el ${date} a las ${startHour}:00 (${appointmentDurationMin} minutos). Tu número de cita es ${citaNumber}.${priceInfo}`,
+        };
+    }
+
+    async cancelAppointment(eventId: string): Promise<boolean> {
+        if (!eventId) return false;
+        await this.calendar.events.delete({
+            calendarId: this.config.calendar.calendarId,
+            eventId,
+        });
+        return true;
+    }
+
+    async rescheduleAppointment(
+        eventId: string,
+        newDate: string,
+        newStartHour: number,
+        durationMin?: number,
+        services?: Service[]
+    ): Promise<BookingResult> {
+        if (!eventId) {
+            return { success: false, message: 'No encontré el evento a reagendar.' };
+        }
+
+        const appointmentDurationMin = durationMin ?? this.config.appointmentDurationMin;
+
+        const allSlots = generateSlots({
+            date: newDate,
+            openHour: this.config.openHour,
+            closeHour: this.config.closeHour,
+            slotIntervalMin: this.config.slotIntervalMin,
+            appointmentDurationMin,
+            timezone: this.config.timezone,
+        });
+
+        const candidate = allSlots.find((s) => s.start.getHours() === newStartHour);
+
+        if (!candidate) {
+            return {
+                success: false,
+                message: `La hora ${newStartHour}:00 no es un bloque válido para reagendar (duración ${appointmentDurationMin} min, bloques de ${this.config.slotIntervalMin} min).`,
+            };
+        }
+
+        const busy = await this.getBusySlots(newDate);
+
+        if (!isSlotAvailable(candidate, busy)) {
+            return {
+                success: false,
+                message: `Lo siento, el bloque de las ${newStartHour}:00 del ${newDate} ya está ocupado.`,
+                slot: candidate,
+            };
+        }
+
+        const updated = await this.calendar.events.patch({
+            calendarId: this.config.calendar.calendarId,
+            eventId,
+            requestBody: {
+                start: { dateTime: candidate.start.toISOString(), timeZone: this.config.timezone },
+                end: { dateTime: candidate.end.toISOString(), timeZone: this.config.timezone },
+            },
+        });
+
+        return {
+            success: true,
+            eventId: updated.data.id ?? eventId,
+            slot: candidate,
+            message: `Cita reagendada para el ${newDate} a las ${newStartHour}:00 (${appointmentDurationMin} minutos).`,
         };
     }
 }

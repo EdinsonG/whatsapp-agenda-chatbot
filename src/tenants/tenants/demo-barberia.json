@@ -1,0 +1,69 @@
+{
+  "id": "demo-barberia",
+  "businessName": "Barbería El Clásico",
+  "timezone": "America/Mexico_City",
+  "openHour": 10,
+  "closeHour": 20,
+  "slotIntervalMin": 60,
+  "appointmentDurationMin": 30,
+  "businessDescription": "Barbería de estilo clásico y moderno especializada en cortes, fades, perfilado y cuidado de barba, ideal para clientes que buscan una atención premium y personalizada.",
+  "businessHours": "Lunes a sábado de 10:00 a 20:00; domingo cerrado.",
+  "location": {
+    "address": "Calle Morelos 88, Roma Sur, Ciudad de México",
+    "googleMapsUrl": "https://maps.google.com/?q=Calle+Morelos+88+Roma+Sur+Ciudad+de+Mexico",
+    "city": "Ciudad de México",
+    "region": "CDMX",
+    "country": "Mexico"
+  },
+  "systemPrompt": "Contexto extra de la barbería: especialistas en cortes clásicos y modernos, fades y arreglo de barba. Atención con turno previo por WhatsApp.",
+  "services": [
+    {
+      "id": "corte-cabello",
+      "name": "Corte de cabello",
+      "priceUsd": 15,
+      "durationMin": 30
+    },
+    {
+      "id": "corte-barba",
+      "name": "Corte + barba",
+      "priceUsd": 20,
+      "durationMin": 45
+    },
+    {
+      "id": "arreglo-barba",
+      "name": "Arreglo de barba",
+      "priceUsd": 10,
+      "durationMin": 20
+    },
+    {
+      "id": "tinte",
+      "name": "Tinte / cambio de color",
+      "priceUsd": 40,
+      "durationMin": 60
+    },
+    {
+      "id": "tratamiento-capilar",
+      "name": "Tratamiento capilar",
+      "priceUsd": 35,
+      "durationMin": 50
+    },
+    {
+      "id": "cejas",
+      "name": "Diseño de cejas",
+      "priceUsd": 8,
+      "durationMin": 15
+    }
+  ],
+  "calendar": {
+    "serviceAccountEmail": "demo-barberia@proyecto-calendar.iam.gserviceaccount.com",
+    "calendarId": "primary",
+    "credentialsPath": "src/tenants/credentials/demo-barberia-service-account.json"
+  },
+  "whatsapp": {
+    "sessionId": "demo-barberia",
+    "rateLimit": {
+      "maxConcurrent": 1,
+      "minTimeMs": 2500
+    }
+  }
+}

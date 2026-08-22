@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
-import { Tenant, TenantConfig } from './types';
+import { Tenant, TenantConfig } from '../interfaces';
 import { env } from '../config/env';
 
 const tenantSchema = z.object({
@@ -12,7 +12,29 @@ const tenantSchema = z.object({
     closeHour: z.number().int().min(0).max(24),
     slotIntervalMin: z.number().int().positive().default(60),
     appointmentDurationMin: z.number().int().positive().default(45),
+    businessDescription: z.string().optional(),
+    businessHours: z.string().optional(),
+    location: z
+        .object({
+            address: z.string().optional(),
+            googleMapsUrl: z.string().url().optional(),
+            city: z.string().optional(),
+            region: z.string().optional(),
+            country: z.string().optional(),
+        })
+        .optional(),
     systemPrompt: z.string().optional().default(''),
+    isDefault: z.boolean().optional().default(false),
+    services: z
+        .array(
+            z.object({
+                id: z.string().min(1),
+                name: z.string().min(1),
+                priceUsd: z.number().positive(),
+                durationMin: z.number().int().positive(),
+            })
+        )
+        .min(1),
     calendar: z.object({
         serviceAccountEmail: z.string().min(1),
         calendarId: z.string().min(1),
@@ -72,12 +94,19 @@ export class TenantManager {
         return this.tenants.find((t) => t.id === id);
     }
 
+    getDefaultTenant(): Tenant | undefined {
+        const id = env.DEFAULT_TENANT || this.tenants.find((t) => t.config.isDefault)?.id;
+        return id ? this.getById(id) : undefined;
+    }
+
     resolveByWhatsApp(from: string): Tenant | undefined {
         const cleanFrom = from.split('@')[0];
         return (
             this.tenants.find((t) =>
                 (t.config.whatsapp.allowedNumbers ?? []).includes(cleanFrom)
-            ) ?? (this.tenants.length === 1 ? this.tenants[0] : undefined)
+            ) ??
+            this.getDefaultTenant() ??
+            this.tenants[0]
         );
     }
 }

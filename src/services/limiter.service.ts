@@ -1,5 +1,5 @@
 import Bottleneck from 'bottleneck';
-import { TenantConfig } from '../tenants/types';
+import { TenantConfig } from '../interfaces';
 
 const limiters = new Map<string, Bottleneck>();
 
