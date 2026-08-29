@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.wwebjs_auth
+.wwebjs_cache
+.env
+*.md
+.git
+.github
+tests
+vitest.config.ts

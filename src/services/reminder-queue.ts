@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import { BookingCustomer, Service, PendingReminder } from '../interfaces';
 import { buildReminderMessage } from './reminder.scheduler';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'reminder-queue' });
 
 export const DEFAULT_REMINDER_QUEUE_PATH = path.resolve(
     process.cwd(),
@@ -9,9 +12,12 @@ export const DEFAULT_REMINDER_QUEUE_PATH = path.resolve(
     'pending-reminders.json'
 );
 
-const sendMessage = async (chatId: string, message: string): Promise<void> => {
-    const { client } = await import('../client');
-    await client.sendMessage(chatId, message);
+let sendFn: (chatId: string, message: string) => Promise<void> = async () => {
+    log.warn('sendFn no configurado. El recordatorio no se envió.');
+};
+
+export const setReminderSender = (fn: (chatId: string, message: string) => Promise<void>): void => {
+    sendFn = fn;
 };
 
 export class ReminderQueue {
@@ -33,11 +39,9 @@ export class ReminderQueue {
             for (const entry of entries) {
                 this.pending.set(entry.id, entry);
             }
-            console.log(
-                `📬 Cola de recordatorios cargada: ${this.pending.size} pendiente(s) desde ${this.persistPath}`
-            );
+            log.info({ count: this.pending.size, path: this.persistPath }, 'Cola de recordatorios cargada');
         } catch (error) {
-            console.error(`No pude cargar la cola de recordatorios:`, error);
+            log.error({ err: error }, 'No pude cargar la cola de recordatorios');
         }
     }
 
@@ -51,7 +55,7 @@ export class ReminderQueue {
                 'utf-8'
             );
         } catch (error) {
-            console.error(`No pude guardar la cola de recordatorios:`, error);
+            log.error({ err: error }, 'No pude guardar la cola de recordatorios');
         }
     }
 
@@ -68,14 +72,16 @@ export class ReminderQueue {
 
     private async sendReminder(reminder: PendingReminder): Promise<void> {
         try {
-            await sendMessage(reminder.chatId, reminder.message);
-            console.log(
-                `📨 Recordatorio (${reminder.leadHours}h) enviado a ${reminder.chatId}`
-            );
+            await sendFn(reminder.chatId, reminder.message);
+            log.info({ leadHours: reminder.leadHours, chatId: reminder.chatId }, 'Recordatorio enviado');
         } catch (error) {
-            console.error(`Error enviando recordatorio:`, error);
+            log.error({ err: error }, 'Error enviando recordatorio');
         } finally {
-            this.remove(reminder.id);
+            try {
+                this.remove(reminder.id);
+            } catch (error) {
+                log.error({ err: error }, 'Error eliminando recordatorio de la cola');
+            }
         }
     }
 
@@ -122,24 +128,32 @@ export class ReminderQueue {
         }
     }
 
-    restoreAll(): number {
+    async restoreAll(): Promise<number> {
         let restored = 0;
+        const pastDue: PendingReminder[] = [];
+        const future: PendingReminder[] = [];
+
         for (const reminder of this.pending.values()) {
             const scheduledAt = new Date(reminder.scheduledAt).getTime();
             if (scheduledAt <= Date.now()) {
-                this.sendReminder(reminder);
-                restored++;
-                continue;
-            }
-            if (!this.timers.has(reminder.id)) {
-                this.startTimer(reminder);
-                restored++;
+                pastDue.push(reminder);
+            } else if (!this.timers.has(reminder.id)) {
+                future.push(reminder);
             }
         }
+
+        for (const reminder of pastDue) {
+            await this.sendReminder(reminder);
+            restored++;
+        }
+
+        for (const reminder of future) {
+            this.startTimer(reminder);
+            restored++;
+        }
+
         if (restored > 0) {
-            console.log(
-                `⏰ Recordatorios restaurados desde la cola: ${restored} pendiente(s).`
-            );
+            log.info({ count: restored }, 'Recordatorios restaurados desde la cola');
         }
         return restored;
     }

@@ -87,7 +87,7 @@ describe('cancelAppointment', () => {
         expect(calendar.listBookings()).toHaveLength(0);
 
         const slots = await calendar.getAvailableSlotsForDate('2026-08-20', 45);
-        expect(slots.some((s) => s.start.getHours() === 10)).toBe(true);
+        expect(slots.some((s) => s.start.getUTCHours() === 10)).toBe(true);
     });
 
     it('devuelve false si el evento no existe', async () => {
@@ -112,9 +112,9 @@ describe('rescheduleAppointment', () => {
         expect(rescheduled.message).toContain('15:00');
 
         const oldDay = await calendar.getAvailableSlotsForDate('2026-08-20', 45);
-        expect(oldDay.some((s) => s.start.getHours() === 10)).toBe(true);
+        expect(oldDay.some((s) => s.start.getUTCHours() === 10)).toBe(true);
         const newDay = await calendar.getAvailableSlotsForDate('2026-08-21', 45);
-        expect(newDay.some((s) => s.start.getHours() === 15)).toBe(false);
+        expect(newDay.some((s) => s.start.getUTCHours() === 15)).toBe(false);
     });
 
     it('rechaza una hora ya ocupada', async () => {

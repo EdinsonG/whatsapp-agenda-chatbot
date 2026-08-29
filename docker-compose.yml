@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    container_name: whatsapp-scheduling-bot
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - '${PORT:-3000}:3000'
+    volumes:
+      - ./data:/app/data
+      - ./.wwebjs_auth:/app/.wwebjs_auth
+    environment:
+      - NODE_ENV=production

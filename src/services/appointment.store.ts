@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { StoredBooking } from '../interfaces';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'appointment-store' });
 
 export const normalizePhone = (value: string): string => value.replace(/\D+/g, '');
 
@@ -11,11 +14,17 @@ export const phonesMatch = (a: string, b: string): boolean => {
     return na === nb;
 };
 
-export const generateCitaNumber = (): string => {
+export const generateCitaNumber = (existing?: Set<string>): string => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    return `C-${code}`;
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let code = '';
+        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        const citaNumber = `C-${code}`;
+        if (!existing || !existing.has(citaNumber)) return citaNumber;
+    }
+    const fallback = `C-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    return fallback;
 };
 
 const normalizeEntry = (entry: StoredBooking): StoredBooking => ({
@@ -48,11 +57,9 @@ export class AppointmentStore {
                 const normalized = normalizeEntry(entry);
                 this.bookings.set(normalized.citaNumber.toUpperCase(), normalized);
             }
-            console.log(
-                `🗂️ Store de citas cargado: ${this.bookings.size} reserva(s) desde ${this.persistPath}`
-            );
+            log.info({ count: this.bookings.size, path: this.persistPath }, 'Store de citas cargado');
         } catch (error) {
-            console.error(`No pude cargar el store de citas desde ${this.persistPath}:`, error);
+            log.error({ err: error, path: this.persistPath }, 'No pude cargar el store de citas');
         }
     }
 
@@ -62,7 +69,7 @@ export class AppointmentStore {
             fs.mkdirSync(path.dirname(this.persistPath), { recursive: true });
             fs.writeFileSync(this.persistPath, JSON.stringify(this.all(), null, 2), 'utf-8');
         } catch (error) {
-            console.error(`No pude guardar el store de citas en ${this.persistPath}:`, error);
+            log.error({ err: error, path: this.persistPath }, 'No pude guardar el store de citas');
         }
     }
 
@@ -90,6 +97,10 @@ export class AppointmentStore {
 
     all(): StoredBooking[] {
         return [...this.bookings.values()];
+    }
+
+    allNumbers(): Set<string> {
+        return new Set(this.bookings.keys());
     }
 }
 

@@ -1,8 +1,9 @@
 import { AppointmentReminderParams } from '../interfaces';
 import { appointmentStore } from './appointment.store';
 import { reminderQueue } from './reminder-queue';
+import { logger } from '../config/logger';
 
-export const REMINDER_LEAD_HOURS = [12, 2] as const;
+const log = logger.child({ module: 'reminder-scheduler' });
 
 export const appointmentAt = (date: string, startHour: number): Date => {
     const at = new Date(`${date}T00:00:00`);
@@ -51,7 +52,7 @@ export const clearAllReminders = (): void => {
 };
 
 export const restoreRemindersFromStore = async (): Promise<void> => {
-    reminderQueue.restoreAll();
+    await reminderQueue.restoreAll();
 
     const now = Date.now();
     let restored = 0;
@@ -72,6 +73,6 @@ export const restoreRemindersFromStore = async (): Promise<void> => {
     }
 
     if (restored > 0) {
-        console.log(`⏰ Recordatorios reprogramados desde el store: ${restored} cita(s).`);
+        log.info({ count: restored }, 'Recordatorios reprogramados desde el store');
     }
 };

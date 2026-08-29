@@ -3,6 +3,9 @@ import path from 'path';
 import { z } from 'zod';
 import { Tenant, TenantConfig } from '../interfaces';
 import { env } from '../config/env';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'tenant-manager' });
 
 const tenantSchema = z.object({
     id: z.string().min(1),
@@ -56,7 +59,7 @@ const tenantsDir = path.resolve(process.cwd(), env.TENANTS_DIR);
 
 const loadTenants = (): Tenant[] => {
     if (!fs.existsSync(tenantsDir)) {
-        console.warn(`⚠️  Directorio de tenants no encontrado: ${tenantsDir}`);
+        log.warn({ path: tenantsDir }, 'Directorio de tenants no encontrado');
         return [];
     }
 
@@ -70,7 +73,7 @@ const loadTenants = (): Tenant[] => {
 
             const result = tenantSchema.safeParse(raw);
             if (!result.success) {
-                console.error(`❌ Tenant inválido en ${file}:`, result.error.flatten());
+                log.error({ file, errors: result.error.flatten() }, 'Tenant inválido');
                 throw new Error(`Configuración de tenant inválida: ${file}`);
             }
 
@@ -80,10 +83,18 @@ const loadTenants = (): Tenant[] => {
 };
 
 export class TenantManager {
+    private static instance: TenantManager;
     private tenants: Tenant[] = [];
 
     constructor() {
         this.tenants = loadTenants();
+    }
+
+    static getInstance(): TenantManager {
+        if (!TenantManager.instance) {
+            TenantManager.instance = new TenantManager();
+        }
+        return TenantManager.instance;
     }
 
     getAll(): Tenant[] {
@@ -110,3 +121,5 @@ export class TenantManager {
         );
     }
 }
+
+export const tenantManager = TenantManager.getInstance();

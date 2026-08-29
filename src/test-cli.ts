@@ -1,11 +1,10 @@
 import readline from 'readline';
-import { TenantManager } from './tenants/tenant.manager';
+import { tenantManager } from './tenants/tenant.manager';
 import { MockCalendarService } from './services/mock-calendar.service';
 import { GoogleConversationService } from './services/google-conversation.service';
 import { MISSING_KEY_MESSAGE } from './services/google-ai.model';
 import { env } from './config/env';
 
-const tenantManager = new TenantManager();
 const tenant = tenantManager.getDefaultTenant() ?? tenantManager.getAll()[0];
 
 if (!tenant) {

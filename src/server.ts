@@ -1,12 +1,22 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { env } from './config/env';
-import { TenantManager } from './tenants/tenant.manager';
+import { tenantManager } from './tenants/tenant.manager';
+import { logger } from './config/logger';
 
 const app = express();
 app.use(express.json());
 
+const requireApiKey = (req: Request, res: Response, next: NextFunction): void => {
+    if (!env.API_KEY) return next();
+    const auth = req.headers.authorization;
+    if (!auth || auth !== `Bearer ${env.API_KEY}`) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
+    next();
+};
+
 export const startHealthCheck = () => {
-    const tenantManager = new TenantManager();
 
     app.get('/health', (req, res) => {
         res.status(200).json({
@@ -16,7 +26,7 @@ export const startHealthCheck = () => {
         });
     });
 
-    app.get('/tenants', (req, res) => {
+    app.get('/tenants', requireApiKey, (req, res) => {
         res.status(200).json(
             tenantManager.getAll().map((t) => ({
                 id: t.id,
@@ -26,6 +36,6 @@ export const startHealthCheck = () => {
     });
 
     app.listen(env.PORT, () => {
-        console.log(`Servidor de monitoreo corriendo en el puerto ${env.PORT}`);
+        logger.info({ port: env.PORT }, 'Servidor de monitoreo corriendo');
     });
 };
