@@ -5,14 +5,38 @@ import {
     scheduleAppointmentReminders,
 } from '../services/reminder.scheduler';
 import { CalendarService, StoredBooking, TenantConfig } from '../interfaces';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'selfservice' });
 
 interface PendingFlow {
     action: 'cancel' | 'reschedule';
     citaNumber?: string;
     date?: string;
+    createdAt: number;
 }
 
 const pendingFlows = new Map<string, PendingFlow>();
+const MAX_FLOWS_PER_CHAT = 3;
+const FLOW_TIMEOUT_MS = 5 * 60 * 1000;
+
+const CLEANUP_INTERVAL_MS = 60_000;
+let cleanupTimer: ReturnType<typeof setInterval> | undefined;
+
+const startCleanup = (): void => {
+    if (cleanupTimer) return;
+    cleanupTimer = setInterval(() => {
+        const now = Date.now();
+        for (const [chatId, flow] of pendingFlows.entries()) {
+            if (now - flow.createdAt > FLOW_TIMEOUT_MS) {
+                pendingFlows.delete(chatId);
+                log.debug({ chatId }, 'Flujo stale eliminado por timeout');
+            }
+        }
+    }, CLEANUP_INTERVAL_MS);
+};
+
+startCleanup();
 
 const CANCEL_RE = /\b(cancelar|cancela|cancelaci[oó]n|anular|anulaci[oó]n|dar de baja)\b/i;
 const RESCHEDULE_RE = /\b(reagendar|reagenda|reprogramar|reprogramaci[oó]n|cambiar|mover|adelantar|posponer|atrasar)\b/i;
@@ -58,6 +82,7 @@ const handleCancelStep = async (
         cancelAppointmentReminders(booking.date, booking.startHour, chatId);
         appointmentStore.remove(booking.citaNumber);
         pendingFlows.delete(chatId);
+        log.info({ chatId, citaNumber: booking.citaNumber }, 'Cita cancelada por autogestión');
         await msg.reply(`✅ Tu cita ${booking.citaNumber} fue cancelada correctamente.`);
     } else {
         await msg.reply('No pude cancelar la cita. Intentá nuevamente más tarde.');
@@ -88,6 +113,7 @@ const handleRescheduleCitaStep = async (
 
 const handleRescheduleDateStep = async (
     msg: Message,
+    config: TenantConfig,
     calendar: CalendarService,
     flow: PendingFlow
 ): Promise<void> => {
@@ -95,6 +121,13 @@ const handleRescheduleDateStep = async (
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         await msg.reply('El formato de fecha no es válido. Usá AAAA-MM-DD, por ejemplo 2026-08-25.');
+        return;
+    }
+
+    const now = new Date();
+    const selectedDate = new Date(`${date}T00:00:00`);
+    if (selectedDate.getTime() < new Date(now.toISOString().slice(0, 10)).getTime()) {
+        await msg.reply('No se puede reagendar a una fecha que ya pasó. Elegí una fecha futura.');
         return;
     }
 
@@ -161,6 +194,7 @@ const handleRescheduleHourStep = async (
             services: booking.services,
         });
         pendingFlows.delete(chatId);
+        log.info({ chatId, citaNumber: booking.citaNumber }, 'Cita reagendada por autogestión');
         await msg.reply(`✅ ${result.message}`);
     } else {
         await msg.reply(`😔 ${result.message}`);
@@ -182,7 +216,7 @@ export const handleSelfServiceMessage = async (
         } else if (!flow.citaNumber) {
             await handleRescheduleCitaStep(msg, calendar, flow);
         } else if (!flow.date) {
-            await handleRescheduleDateStep(msg, calendar, flow);
+            await handleRescheduleDateStep(msg, config, calendar, flow);
         } else {
             await handleRescheduleHourStep(msg, config, calendar, flow);
         }
@@ -192,7 +226,15 @@ export const handleSelfServiceMessage = async (
     const intent = detectSelfServiceIntent(text);
     if (!intent) return false;
 
-    pendingFlows.set(chatId, { action: intent });
+    const activeFlows = [...pendingFlows.keys()].filter((k) => k.startsWith(chatId)).length;
+    if (activeFlows >= MAX_FLOWS_PER_CHAT) {
+        await msg.reply(
+            'Tenés demasiados flujos activos. Por favor esperá unos minutos e intentá de nuevo.'
+        );
+        return true;
+    }
+
+    pendingFlows.set(chatId, { action: intent, createdAt: Date.now() });
     await msg.reply(
         intent === 'cancel'
             ? 'Para cancelar tu cita necesito tu número de cita (formato C-XXXXXX, lo recibiste al agendar). ¿Cuál es?'

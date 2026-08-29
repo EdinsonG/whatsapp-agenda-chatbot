@@ -9,6 +9,8 @@ const envSchema = z.object({
     PORT: z.coerce.number().int().positive().default(3000),
     TENANTS_DIR: z.string().min(1).default('src/tenants/tenants'),
     DEFAULT_TENANT: z.string().min(1).optional().default(''),
+    API_KEY: z.string().optional().default(''),
+    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional().default('info'),
 });
 
 const parsed = envSchema.safeParse(process.env);
