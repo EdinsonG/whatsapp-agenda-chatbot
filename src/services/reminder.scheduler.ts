@@ -1,16 +1,8 @@
-import { BookingCustomer, Service } from '../interfaces';
+import { AppointmentReminderParams } from '../interfaces';
 import { appointmentStore } from './appointment.store';
+import { reminderQueue } from './reminder-queue';
 
 export const REMINDER_LEAD_HOURS = [12, 2] as const;
-
-export interface AppointmentReminderParams {
-    chatId: string;
-    businessName: string;
-    date: string;
-    startHour: number;
-    customer: BookingCustomer;
-    services: Service[];
-}
 
 export const appointmentAt = (date: string, startHour: number): Date => {
     const at = new Date(`${date}T00:00:00`);
@@ -40,48 +32,10 @@ export const buildReminderMessage = (
     );
 };
 
-const timers = new Map<string, NodeJS.Timeout>();
-
-const sendMessage = async (chatId: string, message: string): Promise<void> => {
-    const { client } = await import('../client');
-    await client.sendMessage(chatId, message);
-};
-
-const scheduleOne = (
-    leadHours: number,
-    remindAt: Date,
-    params: AppointmentReminderParams
-): void => {
-    const delay = remindAt.getTime() - Date.now();
-    if (delay <= 0) return;
-
-    const id = `${params.chatId}:${params.date}:${params.startHour}:${leadHours}`;
-    const message = buildReminderMessage(leadHours, params);
-
-    const timer = setTimeout(async () => {
-        try {
-            await sendMessage(params.chatId, message);
-            console.log(`📨 Recordatorio (${leadHours} horas) enviado a ${params.chatId}`);
-        } catch (error) {
-            console.error(`Error enviando recordatorio (${leadHours} horas):`, error);
-        } finally {
-            timers.delete(id);
-        }
-    }, delay);
-
-    timers.set(id, timer);
-};
-
 export const scheduleAppointmentReminders = async (
     params: AppointmentReminderParams
 ): Promise<void> => {
-    const at = appointmentAt(params.date, params.startHour);
-    const hoursUntil = (at.getTime() - Date.now()) / 3600000;
-
-    for (const leadHours of getReminderLeads(hoursUntil)) {
-        const remindAt = new Date(at.getTime() - leadHours * 3600000);
-        scheduleOne(leadHours, remindAt, params);
-    }
+    reminderQueue.schedule(params);
 };
 
 export const cancelAppointmentReminders = (
@@ -89,23 +43,16 @@ export const cancelAppointmentReminders = (
     startHour: number,
     chatId?: string
 ): void => {
-    for (const [id, timer] of timers.entries()) {
-        const matches =
-            id.includes(`${date}:${startHour}`) &&
-            (chatId === undefined || id.startsWith(`${chatId}:`));
-        if (matches) {
-            clearTimeout(timer);
-            timers.delete(id);
-        }
-    }
+    reminderQueue.cancel(date, startHour, chatId);
 };
 
 export const clearAllReminders = (): void => {
-    for (const timer of timers.values()) clearTimeout(timer);
-    timers.clear();
+    reminderQueue.clear();
 };
 
 export const restoreRemindersFromStore = async (): Promise<void> => {
+    reminderQueue.restoreAll();
+
     const now = Date.now();
     let restored = 0;
 
