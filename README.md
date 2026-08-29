@@ -61,7 +61,9 @@ src/
 │   ├── google-conversation.service.ts # Conversación multi-turno con herramientas
 │   ├── google-ai.model.ts         # Cliente compartido del modelo (@ai-sdk/google)
 │   ├── appointment.store.ts       # Store persistente de citas (número C-XXXXXX)
-│   ├── reminder.scheduler.ts      # Recordatorios 12h/2h antes de la cita
+│   ├── reminder-queue.ts          # Cola persistente de recordatorios (sobrevive reinicios)
+│   ├── reminder.scheduler.ts      # Recordatorios 12h/2h antes de la cita (usa la cola)
+│   ├── session-monitor.ts         # Heartbeat + auto-reconexión de sesión WhatsApp
 │   ├── google-calendar.service.ts # Disponibilidad + creación de eventos
 │   └── limiter.service.ts       # Rate limiter (bottleneck) por tenant
 ├── handlers/
@@ -164,6 +166,35 @@ lista                          → la IA lista las citas
 
 ## 🛡️ Resiliencia
 
-- **Rate limiting:** `bottleneck` por tenant (mitiga riesgo de ban en WhatsApp).
-- **Simulación humana:** `sendStateTyping` + retardo natural antes de responder.
-- **Healthcheck** `/health` para despliegues 24/7 e integración continua.
+### Lo que protege el producto
+
+- **Recordatorios persistentes:** cada recordatorio se guarda en disco (`data/pending-reminders.json`) al momento de agendar. Si el proceso se reinicia, se restauran automáticamente al iniciar.
+- **Cola independiente de la sesión:** los recordatorios no dependen de que WhatsApp esté conectado en el momento del agendamiento. Se almacenan y se envían cuando la sesión está activa.
+- **Restauración en reconexión:** cuando la sesión WhatsApp se reconecta, se reprograman los recordatorios pendientes automáticamente.
+
+### Lo que mitiga riesgos operativos
+
+- **Monitoreo de sesión (heartbeat):** `SessionMonitor` verifica la conexión cada 30 segundos. Si la sesión muere, detecta la caída inmediatamente.
+- **Auto-reconexión:** al detectar desconexión, intenta reconectar automáticamente con backoff exponencial (hasta 10 intentos). No requiere reinicio manual.
+- **Rate limiting:** `bottleneck` por tenant evita rate limits de WhatsApp.
+- **Healthcheck:** `/health` para monitoreo en producción.
+
+### Limitaciones conocidas
+
+- **Sesión QR por tenant:** cada tenant tiene su propia sesión de WhatsApp (whatsapp-web.js). Si la sesión se pierde y la reconexión automática falla, se requiere reinicio manual y re-escaneo del QR.
+- **Un solo proceso:** los recordatorios viven en un solo proceso Node.js. Si el proceso muere, la cola persistente permite restauración al reiniciar, pero no hay redundancia entre múltiples instancias.
+- **Sin fallback externo:** si WhatsApp no está disponible, no hay envío por SMS ni push como alternativa.
+
+### Flujo de un recordatorio
+
+```
+Agendamiento → reminder-queue (graba a disco) → setTimeout (in-memory)
+                                                      ↓
+                                               si el proceso muere:
+                                               disco conserva el recordatorio
+                                                      ↓
+                                               al reiniciar: restoreAll()
+                                               re-programa los timers pendientes
+                                                      ↓
+                                               envía por WhatsApp
+```

@@ -5,7 +5,7 @@ dotenv.config();
 
 const envSchema = z.object({
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional().default(''),
-    MODEL_NAME: z.string().min(1).default('gemma-4-26b-a4b-it'),
+    MODEL_NAME: z.string().min(1).default('gemini-3.6-flash'),
     PORT: z.coerce.number().int().positive().default(3000),
     TENANTS_DIR: z.string().min(1).default('src/tenants/tenants'),
     DEFAULT_TENANT: z.string().min(1).optional().default(''),
