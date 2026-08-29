@@ -30,11 +30,13 @@ cp .env.example .env   # y edítalo con tus valores
 
 | Variable | Descripción | Ejemplo |
 | :--- | :--- | :--- |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | API key de Google AI Studio (Gemma 4 / Gemini) | `AIza...` |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | API key de Google AI Studio | `AIza...` |
 | `MODEL_NAME` | Modelo a usar | `gemini-3.6-flash` |
 | `PORT` | Puerto del healthcheck | `3000` |
 | `TENANTS_DIR` | Carpeta con los JSON de tenants | `src/tenants/tenants` |
-| `DEFAULT_TENANT` | Tenant por defecto para números no asignados | `demo-showcase` |
+| `DEFAULT_TENANT` | Tenant por defecto | `demo-showcase` |
+| `API_KEY` | API key para autenticar `/tenants` | (vacío = sin auth) |
+| `LOG_LEVEL` | Nivel de log | `info` |
 
 > Los datos **por cliente** no van en `.env`: se definen en el JSON de cada tenant.
 
@@ -44,34 +46,44 @@ cp .env.example .env   # y edítalo con tus valores
 
 ```
 src/
-├── index.ts                     # Bootstrap (healthcheck + cliente WhatsApp)
-├── server.ts                    # Express: /health y /tenants
+├── index.ts                     # Bootstrap multitenant + graceful shutdown
+├── client.ts                    # Un Client WhatsApp por tenant + SessionMonitor
+├── server.ts                    # Express: /health (publico) y /tenants (con auth)
 ├── config/
-│   └── env.ts                   # Validación de variables de entorno (zod)
+│   ├── env.ts                   # Validación de variables de entorno (zod)
+│   └── logger.ts                # Logging estructurado (Pino)
+├── interfaces/
+│   ├── ai.ts, calendar.ts, scheduling.ts, session.ts, tenant.ts
 ├── core/
 │   └── scheduling/
-│       └── scheduling.rules.ts  # Lógica pura: slots, solapamiento, franjas (testeable)
+│       └── scheduling.rules.ts  # Lógica pura: slots, solapamiento, franjas
 ├── tenants/
-│   ├── types.ts                 # Tipos de TenantConfig
 │   ├── tenant.manager.ts        # Carga + resolución multitenant
 │   ├── tenants/*.json           # Configuración por cliente
 │   └── credentials/*.json       # Service Account por cliente (gitignored)
 ├── services/
-│   ├── google.service.ts          # Integración IA (Gemini + tool calling de agendamiento)
 │   ├── google-conversation.service.ts # Conversación multi-turno con herramientas
-│   ├── google-ai.model.ts         # Cliente compartido del modelo (@ai-sdk/google)
-│   ├── appointment.store.ts       # Store persistente de citas (número C-XXXXXX)
-│   ├── reminder-queue.ts          # Cola persistente de recordatorios (sobrevive reinicios)
-│   ├── reminder.scheduler.ts      # Recordatorios 12h/2h antes de la cita (usa la cola)
-│   ├── session-monitor.ts         # Heartbeat + auto-reconexión de sesión WhatsApp
-│   ├── google-calendar.service.ts # Disponibilidad + creación de eventos
-│   └── limiter.service.ts       # Rate limiter (bottleneck) por tenant
+│   ├── google-ai.model.ts       # Cliente compartido del modelo (@ai-sdk/google)
+│   ├── google-calendar.service.ts # Google Calendar con error handling por tipo
+│   ├── appointment.store.ts     # Store persistente de citas (C-XXXXXX)
+│   ├── reminder-queue.ts        # Cola persistente de recordatorios (sobrevive reinicios)
+│   ├── reminder.scheduler.ts    # Recordatorios 12h/2h antes de la cita
+│   ├── session-monitor.ts       # Auto-reconexión con backoff exponencial
+│   ├── limiter.service.ts       # Rate limiter (bottleneck) por tenant
+│   └── google.service.ts        # IA single-turn (alternativa simple)
 ├── handlers/
-│   └── message.handler.ts       # Flujo de WhatsApp (typing + rate limit)
+│   ├── message.handler.ts       # Flujo multi-turno (typing + rate limit + conversación)
+│   └── selfservice.handler.ts   # Autogestión cancel/reagendar (con rate limit + timeout)
 └── prompts/
     └── scheduling.prompt.ts     # System prompt parametrizado por tenant
 tests/
-└── scheduling.rules.test.ts     # Pruebas de solapamiento y franjas
+├── scheduling.rules.test.ts
+├── reminder.scheduler.test.ts
+├── reminder-queue.test.ts
+├── session-monitor.test.ts
+├── selfservice.test.ts
+├── tenant.manager.test.ts
+└── tenant.services.test.ts
 ```
 
 ### Reglas de negocio (núcleo)
@@ -93,7 +105,15 @@ pnpm test           # Corre las pruebas unitarias (Vitest)
 pnpm cli            # Prueba conversacional con IA (Gemini)
 ```
 
-Al iniciar por primera vez, escanea el **código QR** que aparece en la terminal con tu WhatsApp.
+### Docker
+
+```bash
+docker compose up -d          # Construir y ejecutar en background
+docker compose logs -f bot    # Ver logs
+docker compose down           # Detener
+```
+
+Al iniciar por primera vez, escanea el **código QR** que aparece en la terminal (o en los logs de Docker) con tu WhatsApp.
 
 **Healthcheck:** `GET http://localhost:3000/health`
 **Lista de tenants:** `GET http://localhost:3000/tenants`
@@ -174,10 +194,12 @@ lista                          → la IA lista las citas
 
 ### Lo que mitiga riesgos operativos
 
-- **Monitoreo de sesión (heartbeat):** `SessionMonitor` verifica la conexión cada 30 segundos. Si la sesión muere, detecta la caída inmediatamente.
-- **Auto-reconexión:** al detectar desconexión, intenta reconectar automáticamente con backoff exponencial (hasta 10 intentos). No requiere reinicio manual.
-- **Rate limiting:** `bottleneck` por tenant evita rate limits de WhatsApp.
-- **Healthcheck:** `/health` para monitoreo en producción.
+- **Auto-reconexión:** al detectar desconexión o browser crash, intenta reconectar automáticamente con backoff exponencial (hasta 10 intentos). No requiere reinicio manual.
+- **Graceful shutdown:** al recibir SIGTERM/SIGINT, destruye clientes WhatsApp, cancela timers y persiste datos pendientes antes de cerrar.
+- **Rate limiting:** `bottleneck` por tenant evita rate limits de WhatsApp. Flujos de autogestión limitados a 3 simultáneos por chat con timeout de 5 minutos.
+- **Logging estructurado:** Pino con contexto por tenant y correlation por mensaje.
+- **Autenticación API:** `/tenants` protegido con `API_KEY` (opcional). `/health` siempre público.
+- **Docker:** listo para despliegue con `docker compose up -d`.
 
 ### Limitaciones conocidas
 
