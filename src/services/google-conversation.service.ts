@@ -4,6 +4,7 @@ import { CalendarService, Service, servicesTotalDuration, TenantConfig } from '.
 import { buildSchedulingSystemPrompt } from '../prompts/scheduling.prompt';
 import { appointmentStore, normalizePhone } from './appointment.store';
 import { getModel, MISSING_KEY_MESSAGE } from './google-ai.model';
+import { logger } from '../config/logger';
 
 export const TOOL_AVAILABLE_SLOTS = 'get_available_slots';
 export const TOOL_BOOK = 'book_appointment';
@@ -247,14 +248,14 @@ export class GoogleConversationService {
                 return stepText;
             }
 
-            console.warn(
-                'Respuesta vacía del modelo:',
-                JSON.stringify({
+            logger.warn(
+                {
                     finishReason: result.finishReason,
                     steps: result.steps.length,
                     toolCalls: result.toolCalls.length,
                     usage: result.usage,
-                })
+                },
+                'Respuesta vacía del modelo'
             );
             return 'Disculpa, no logré procesar tu mensaje. ¿Podrías reformularlo?';
         } catch (error: any) {
@@ -262,7 +263,7 @@ export class GoogleConversationService {
                 return 'Estoy recibiendo demasiadas solicitudes. Dame un segundo y vuelve a intentarlo, por favor.';
             }
             if (error?.message === MISSING_KEY_MESSAGE) throw error;
-            console.error('Error en Google Conversation Service:', error?.message);
+            logger.error({ err: error }, 'Error en Google Conversation Service');
             return 'Hubo un problema técnico de mi parte. Inténtalo de nuevo en un momento.';
         }
     }

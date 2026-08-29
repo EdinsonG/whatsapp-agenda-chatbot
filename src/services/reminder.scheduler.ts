@@ -1,6 +1,9 @@
 import { AppointmentReminderParams } from '../interfaces';
 import { appointmentStore } from './appointment.store';
 import { reminderQueue } from './reminder-queue';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'reminder-scheduler' });
 
 export const REMINDER_LEAD_HOURS = [12, 2] as const;
 
@@ -72,6 +75,6 @@ export const restoreRemindersFromStore = async (): Promise<void> => {
     }
 
     if (restored > 0) {
-        console.log(`⏰ Recordatorios reprogramados desde el store: ${restored} cita(s).`);
+        log.info({ count: restored }, 'Recordatorios reprogramados desde el store');
     }
 };

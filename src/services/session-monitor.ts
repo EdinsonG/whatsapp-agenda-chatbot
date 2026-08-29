@@ -1,8 +1,10 @@
 import { Client } from 'whatsapp-web.js';
 import { SessionMonitorOptions } from '../interfaces';
+import { logger } from '../config/logger';
 
 export class SessionMonitor {
     private client: Client;
+    private log = logger.child({ module: 'session-monitor' });
     private reconnectTimer?: ReturnType<typeof setTimeout>;
     private reconnectAttempts = 0;
     private destroyed = false;
@@ -19,13 +21,13 @@ export class SessionMonitor {
         };
 
         this.client.on('disconnected', (reason) => {
-            console.warn(`⚠️ Sesión WhatsApp desconectada: ${reason}`);
+            this.log.warn({ reason }, 'Sesión WhatsApp desconectada');
             this.options.onDisconnected();
             this.attemptReconnect();
         });
 
         this.client.on('browser_crash', (message) => {
-            console.error(`💥 Browser crash: ${message}`);
+            this.log.error({ message }, 'Browser crash');
             this.options.onDisconnected();
             this.attemptReconnect();
         });
@@ -34,8 +36,9 @@ export class SessionMonitor {
     private attemptReconnect(): void {
         if (this.destroyed) return;
         if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
-            console.error(
-                `❌ Máximo de intentos de reconexión alcanzado (${this.options.maxReconnectAttempts}). Se requiere reinicio manual.`
+            this.log.error(
+                { maxAttempts: this.options.maxReconnectAttempts },
+                'Máximo de intentos de reconexión alcanzado'
             );
             this.options.onFailed();
             return;
@@ -43,8 +46,9 @@ export class SessionMonitor {
 
         this.reconnectAttempts++;
         const delay = Math.min(1000 * 2 ** (this.reconnectAttempts - 1), 60_000);
-        console.log(
-            `🔄 Reconexión ${this.reconnectAttempts}/${this.options.maxReconnectAttempts} en ${delay / 1000}s...`
+        this.log.info(
+            { attempt: this.reconnectAttempts, max: this.options.maxReconnectAttempts, delaySec: delay / 1000 },
+            'Intentando reconexión'
         );
         this.options.onReconnecting(this.reconnectAttempts);
 
@@ -53,11 +57,11 @@ export class SessionMonitor {
             try {
                 await this.client.destroy();
                 await this.client.initialize();
-                console.log('✅ Reconexión exitosa.');
+                this.log.info('Reconexión exitosa');
                 this.reconnectAttempts = 0;
                 this.options.onReconnected();
             } catch (error) {
-                console.error('Error durante reconexión:', error);
+                this.log.error({ err: error }, 'Error durante reconexión');
                 this.attemptReconnect();
             }
         }, delay);

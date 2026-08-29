@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { StoredBooking } from '../interfaces';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'appointment-store' });
 
 export const normalizePhone = (value: string): string => value.replace(/\D+/g, '');
 
@@ -48,11 +51,9 @@ export class AppointmentStore {
                 const normalized = normalizeEntry(entry);
                 this.bookings.set(normalized.citaNumber.toUpperCase(), normalized);
             }
-            console.log(
-                `🗂️ Store de citas cargado: ${this.bookings.size} reserva(s) desde ${this.persistPath}`
-            );
+            log.info({ count: this.bookings.size, path: this.persistPath }, 'Store de citas cargado');
         } catch (error) {
-            console.error(`No pude cargar el store de citas desde ${this.persistPath}:`, error);
+            log.error({ err: error, path: this.persistPath }, 'No pude cargar el store de citas');
         }
     }
 
@@ -62,7 +63,7 @@ export class AppointmentStore {
             fs.mkdirSync(path.dirname(this.persistPath), { recursive: true });
             fs.writeFileSync(this.persistPath, JSON.stringify(this.all(), null, 2), 'utf-8');
         } catch (error) {
-            console.error(`No pude guardar el store de citas en ${this.persistPath}:`, error);
+            log.error({ err: error, path: this.persistPath }, 'No pude guardar el store de citas');
         }
     }
 

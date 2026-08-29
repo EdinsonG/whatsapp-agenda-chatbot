@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { AIResponse, ScheduleIntent, TenantConfig } from '../interfaces';
 import { buildSchedulingSystemPrompt } from '../prompts/scheduling.prompt';
 import { getModel } from './google-ai.model';
+import { logger } from '../config/logger';
+
+const log = logger.child({ module: 'google-ai' });
 
 export const SCHEDULE_TOOL_NAME = 'book_appointment';
 
@@ -77,7 +80,7 @@ export const getTenantAIResponse = async (
                     'Estoy recibiendo demasiadas solicitudes. Dame un segundo y vuelve a intentarlo, por favor.',
             };
         }
-        console.error('Error en Google AI Service:', error?.message);
+        log.error({ err: error }, 'Error en Google AI Service');
         return {
             content: 'Hubo un problema técnico de mi parte. Inténtalo de nuevo en un momento.',
         };
