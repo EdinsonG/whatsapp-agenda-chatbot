@@ -2,13 +2,14 @@ import { google, calendar_v3 } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, Service, TenantConfig, TimeSlot } from '../interfaces';
-import { generateCitaNumber } from './appointment.store';
+import { generateCitaNumber, appointmentStore } from './appointment.store';
 import {
     getAvailableSlots,
     isSlotAvailable,
     generateSlots,
 } from '../core/scheduling/scheduling.rules';
 import { logger } from '../config/logger';
+import { createDateInTimezone } from '../core/scheduling/scheduling.rules';
 
 const log = logger.child({ module: 'google-calendar' });
 
@@ -45,46 +46,62 @@ export class GoogleCalendarService implements CalendarService {
     }
 
     private async getBusySlots(date: string): Promise<TimeSlot[]> {
-        const startOfDay = new Date(`${date}T00:00:00`);
-        const endOfDay = new Date(`${date}T23:59:59`);
+        const startOfDay = createDateInTimezone(date, 0, this.config.timezone);
+        const endOfDay = createDateInTimezone(date, 23, this.config.timezone);
+        endOfDay.setUTCMinutes(59, 59, 999);
 
-        try {
-            const res = await this.calendar.freebusy.query({
-                requestBody: {
-                    timeMin: startOfDay.toISOString(),
-                    timeMax: endOfDay.toISOString(),
-                    items: [{ id: this.config.calendar.calendarId }],
-                    timeZone: this.config.timezone,
-                },
-            });
+        const maxRetries = 2;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const res = await this.calendar.freebusy.query({
+                    requestBody: {
+                        timeMin: startOfDay.toISOString(),
+                        timeMax: endOfDay.toISOString(),
+                        items: [{ id: this.config.calendar.calendarId }],
+                        timeZone: this.config.timezone,
+                    },
+                });
 
-            return (res.data.calendars?.[this.config.calendar.calendarId]?.busy ?? []).map(
-                (period) => ({
-                    start: new Date(period.start!),
-                    end: new Date(period.end!),
-                })
-            );
-        } catch (error: any) {
-            const err = error as GoogleAPIError;
-            if (isAuthError(err)) {
-                log.error({ tenant: this.config.id, date }, 'Error de autenticación con Google Calendar. Verificar credenciales.');
-                throw new Error('Error de autenticación con Google Calendar. Verificar credenciales de la service account.');
+                return (res.data.calendars?.[this.config.calendar.calendarId]?.busy ?? []).map(
+                    (period) => ({
+                        start: new Date(period.start!),
+                        end: new Date(period.end!),
+                    })
+                );
+            } catch (error: any) {
+                const err = error as GoogleAPIError;
+                if (isAuthError(err)) {
+                    log.error({ tenant: this.config.id, date }, 'Error de autenticación con Google Calendar.');
+                    throw new Error('Error de autenticación con Google Calendar. Verificar credenciales.');
+                }
+                if (isPermissionError(err)) {
+                    log.error({ tenant: this.config.id, date }, 'Permiso denegado en Google Calendar.');
+                    throw new Error('Permiso denegado. Verificar que el calendario fue compartido con la service account.');
+                }
+                if (isNotFoundError(err)) {
+                    log.error({ tenant: this.config.id, calendarId: this.config.calendar.calendarId }, 'Calendario no encontrado.');
+                    throw new Error(`Calendario "${this.config.calendar.calendarId}" no encontrado.`);
+                }
+                if (isRateLimitError(err)) {
+                    if (attempt < maxRetries) {
+                        const delay = 1000 * 2 ** attempt;
+                        log.warn({ tenant: this.config.id, attempt: attempt + 1 }, 'Rate limit, reintentando...');
+                        await new Promise((r) => setTimeout(r, delay));
+                        continue;
+                    }
+                    throw new Error('Límite de solicitudes de Google Calendar alcanzado.');
+                }
+                if (attempt < maxRetries && !err.code) {
+                    const delay = 1000 * 2 ** attempt;
+                    log.warn({ tenant: this.config.id, attempt: attempt + 1 }, 'Error transitorio, reintentando...');
+                    await new Promise((r) => setTimeout(r, delay));
+                    continue;
+                }
+                log.error({ err, tenant: this.config.id, date }, 'Error consultando disponibilidad');
+                throw error;
             }
-            if (isPermissionError(err)) {
-                log.error({ tenant: this.config.id, date }, 'Permiso denegado en Google Calendar. Verificar que el calendario fue compartido con la service account.');
-                throw new Error('Permiso denegado. Verificar que el calendario fue compartido con la service account.');
-            }
-            if (isNotFoundError(err)) {
-                log.error({ tenant: this.config.id, calendarId: this.config.calendar.calendarId }, 'Calendario no encontrado.');
-                throw new Error(`Calendario "${this.config.calendar.calendarId}" no encontrado.`);
-            }
-            if (isRateLimitError(err)) {
-                log.warn({ tenant: this.config.id }, 'Rate limit de Google Calendar alcanzado.');
-                throw new Error('Límite de solicitudes de Google Calendar alcanzado. Intentá de nuevo en unos segundos.');
-            }
-            log.error({ err, tenant: this.config.id, date }, 'Error consultando disponibilidad en Google Calendar');
-            throw error;
         }
+        throw new Error('Error consultando disponibilidad después de reintentos.');
     }
 
     async getAvailableSlotsForDate(date: string, durationMin?: number): Promise<TimeSlot[]> {
@@ -149,7 +166,7 @@ export class GoogleCalendarService implements CalendarService {
         }
 
         const customerFullName = `${customer.firstName} ${customer.lastName}`.trim();
-        const citaNumber = generateCitaNumber();
+        const citaNumber = generateCitaNumber(appointmentStore.allNumbers());
         const servicesInfo = services?.length
             ? `Servicios: ${services.map((s) => `${s.name} ($${s.priceUsd} USD, ${s.durationMin} min)`).join(', ')}`
             : '';

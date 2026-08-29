@@ -1,5 +1,5 @@
 import { BookingCustomer, BookingResult, CalendarService, missingBookingFields, Service, TenantConfig, TimeSlot } from '../interfaces';
-import { generateCitaNumber } from './appointment.store';
+import { generateCitaNumber, appointmentStore } from './appointment.store';
 import {
     getAvailableSlots,
     isSlotAvailable,
@@ -71,7 +71,7 @@ export class MockCalendarService implements CalendarService {
             timezone: this.config.timezone,
         });
 
-        const candidate = allSlots.find((s) => s.start.getHours() === startHour);
+        const candidate = allSlots.find((s) => s.start.getUTCHours() === startHour);
 
         if (!candidate) {
             return {
@@ -88,7 +88,7 @@ export class MockCalendarService implements CalendarService {
             };
         }
 
-        const citaNumber = generateCitaNumber();
+        const citaNumber = generateCitaNumber(appointmentStore.allNumbers());
         this.events.push({
             id: `mock-${this.nextId++}`,
             date,
@@ -144,7 +144,7 @@ export class MockCalendarService implements CalendarService {
             timezone: this.config.timezone,
         });
 
-        const candidate = allSlots.find((s) => s.start.getHours() === newStartHour);
+        const candidate = allSlots.find((s) => s.start.getUTCHours() === newStartHour);
 
         if (!candidate) {
             return {

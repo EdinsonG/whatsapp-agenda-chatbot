@@ -5,8 +5,6 @@ import { logger } from '../config/logger';
 
 const log = logger.child({ module: 'reminder-scheduler' });
 
-export const REMINDER_LEAD_HOURS = [12, 2] as const;
-
 export const appointmentAt = (date: string, startHour: number): Date => {
     const at = new Date(`${date}T00:00:00`);
     at.setHours(startHour, 0, 0, 0);
@@ -54,7 +52,7 @@ export const clearAllReminders = (): void => {
 };
 
 export const restoreRemindersFromStore = async (): Promise<void> => {
-    reminderQueue.restoreAll();
+    await reminderQueue.restoreAll();
 
     const now = Date.now();
     let restored = 0;

@@ -8,6 +8,13 @@ import { Tenant, TenantConfig } from '../interfaces';
 
 const calendarCache = new Map<string, GoogleCalendarService>();
 const conversationCache = new Map<string, GoogleConversationService>();
+const MAX_CONVERSATIONS = 100;
+
+const evictOldestConversation = (): void => {
+    if (conversationCache.size <= MAX_CONVERSATIONS) return;
+    const firstKey = conversationCache.keys().next().value;
+    if (firstKey) conversationCache.delete(firstKey);
+};
 
 const getCalendar = (tenant: TenantConfig): GoogleCalendarService => {
     let calendar = calendarCache.get(tenant.id);
@@ -25,6 +32,7 @@ const getConversation = (
 ): GoogleConversationService => {
     let conversation = conversationCache.get(chatId);
     if (!conversation) {
+        evictOldestConversation();
         conversation = new GoogleConversationService(tenant, calendar, chatId);
         conversationCache.set(chatId, conversation);
     }

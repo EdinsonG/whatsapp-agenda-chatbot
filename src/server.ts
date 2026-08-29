@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { env } from './config/env';
-import { TenantManager } from './tenants/tenant.manager';
+import { tenantManager } from './tenants/tenant.manager';
 import { logger } from './config/logger';
 
 const app = express();
@@ -17,7 +17,6 @@ const requireApiKey = (req: Request, res: Response, next: NextFunction): void =>
 };
 
 export const startHealthCheck = () => {
-    const tenantManager = new TenantManager();
 
     app.get('/health', (req, res) => {
         res.status(200).json({

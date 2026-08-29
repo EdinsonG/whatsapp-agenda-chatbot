@@ -83,10 +83,18 @@ const loadTenants = (): Tenant[] => {
 };
 
 export class TenantManager {
+    private static instance: TenantManager;
     private tenants: Tenant[] = [];
 
     constructor() {
         this.tenants = loadTenants();
+    }
+
+    static getInstance(): TenantManager {
+        if (!TenantManager.instance) {
+            TenantManager.instance = new TenantManager();
+        }
+        return TenantManager.instance;
     }
 
     getAll(): Tenant[] {
@@ -113,3 +121,5 @@ export class TenantManager {
         );
     }
 }
+
+export const tenantManager = TenantManager.getInstance();

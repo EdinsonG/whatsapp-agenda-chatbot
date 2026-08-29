@@ -138,16 +138,21 @@ export class GoogleConversationService {
         });
 
         const listTool = tool({
-            description: 'Lista las citas ya agendadas en esta sesión de prueba.',
+            description: 'Lista las citas ya agendadas para este chat.',
             inputSchema: z.object({}),
             execute: async () => {
-                const bookings = (this.calendar as any).listBookings?.() ?? [];
+                const allBookings = appointmentStore.all();
+                const bookings = allBookings.filter(
+                    (b) =>
+                        b.chatId === this.chatId ||
+                        normalizePhone(b.chatId) === normalizePhone(this.chatId)
+                );
                 if (!bookings.length) {
-                    return 'No hay citas agendadas en esta sesión.';
+                    return 'No hay citas agendadas para este número.';
                 }
                 const list = bookings
                     .map(
-                        (b: any) =>
+                        (b) =>
                             `${b.date} ${String(b.startHour).padStart(2, '0')}:00 - ${b.customer.firstName} ${b.customer.lastName} (${b.services?.map((s: Service) => s.name).join(', ') ?? 'sin servicios'})`
                     )
                     .join('\n');

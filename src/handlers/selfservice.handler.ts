@@ -38,6 +38,13 @@ const startCleanup = (): void => {
 
 startCleanup();
 
+export const stopCleanup = (): void => {
+    if (cleanupTimer) {
+        clearInterval(cleanupTimer);
+        cleanupTimer = undefined;
+    }
+};
+
 const CANCEL_RE = /\b(cancelar|cancela|cancelaci[oó]n|anular|anulaci[oó]n|dar de baja)\b/i;
 const RESCHEDULE_RE = /\b(reagendar|reagenda|reprogramar|reprogramaci[oó]n|cambiar|mover|adelantar|posponer|atrasar)\b/i;
 const BOOKING_WORD_RE = /\b(cita|turno|reserva)\b/i;

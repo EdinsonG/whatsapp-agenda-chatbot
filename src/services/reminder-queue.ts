@@ -77,7 +77,11 @@ export class ReminderQueue {
         } catch (error) {
             log.error({ err: error }, 'Error enviando recordatorio');
         } finally {
-            this.remove(reminder.id);
+            try {
+                this.remove(reminder.id);
+            } catch (error) {
+                log.error({ err: error }, 'Error eliminando recordatorio de la cola');
+            }
         }
     }
 
@@ -124,20 +128,30 @@ export class ReminderQueue {
         }
     }
 
-    restoreAll(): number {
+    async restoreAll(): Promise<number> {
         let restored = 0;
+        const pastDue: PendingReminder[] = [];
+        const future: PendingReminder[] = [];
+
         for (const reminder of this.pending.values()) {
             const scheduledAt = new Date(reminder.scheduledAt).getTime();
             if (scheduledAt <= Date.now()) {
-                this.sendReminder(reminder);
-                restored++;
-                continue;
-            }
-            if (!this.timers.has(reminder.id)) {
-                this.startTimer(reminder);
-                restored++;
+                pastDue.push(reminder);
+            } else if (!this.timers.has(reminder.id)) {
+                future.push(reminder);
             }
         }
+
+        for (const reminder of pastDue) {
+            await this.sendReminder(reminder);
+            restored++;
+        }
+
+        for (const reminder of future) {
+            this.startTimer(reminder);
+            restored++;
+        }
+
         if (restored > 0) {
             log.info({ count: restored }, 'Recordatorios restaurados desde la cola');
         }

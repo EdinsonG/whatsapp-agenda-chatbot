@@ -14,11 +14,17 @@ export const phonesMatch = (a: string, b: string): boolean => {
     return na === nb;
 };
 
-export const generateCitaNumber = (): string => {
+export const generateCitaNumber = (existing?: Set<string>): string => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    return `C-${code}`;
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let code = '';
+        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        const citaNumber = `C-${code}`;
+        if (!existing || !existing.has(citaNumber)) return citaNumber;
+    }
+    const fallback = `C-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    return fallback;
 };
 
 const normalizeEntry = (entry: StoredBooking): StoredBooking => ({
@@ -91,6 +97,10 @@ export class AppointmentStore {
 
     all(): StoredBooking[] {
         return [...this.bookings.values()];
+    }
+
+    allNumbers(): Set<string> {
+        return new Set(this.bookings.keys());
     }
 }
 

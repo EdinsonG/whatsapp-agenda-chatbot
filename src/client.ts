@@ -1,6 +1,6 @@
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
-import { TenantManager } from './tenants/tenant.manager';
+import { tenantManager } from './tenants/tenant.manager';
 import { createMessageHandler } from './handlers/message.handler';
 import { SessionMonitor } from './services/session-monitor';
 import { createTenantLogger } from './config/logger';
@@ -18,7 +18,6 @@ export const getClients = () => clients;
 export const getClient = (tenantId: string) => clients.get(tenantId);
 
 export const initializeClients = (): TenantClient[] => {
-    const tenantManager = new TenantManager();
     const tenants = tenantManager.getAll();
     const result: TenantClient[] = [];
 

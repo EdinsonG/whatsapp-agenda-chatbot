@@ -2,7 +2,19 @@ import { initializeClients, destroyAllClients, getClients } from './client';
 import { startHealthCheck } from './server';
 import { restoreRemindersFromStore } from './services/reminder.scheduler';
 import { setReminderSender } from './services/reminder-queue';
+import { stopCleanup } from './handlers/selfservice.handler';
 import { logger } from './config/logger';
+import { tenantManager } from './tenants/tenant.manager';
+
+process.on('unhandledRejection', (reason) => {
+    logger.fatal({ err: reason }, 'Unhandled rejection');
+    process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'Uncaught exception');
+    process.exit(1);
+});
 
 const startBot = async () => {
     try {
@@ -19,7 +31,9 @@ const startBot = async () => {
                 try {
                     await entry.client.sendMessage(chatId, message);
                     return;
-                } catch {}
+                } catch (error) {
+                    logger.warn({ err: error, chatId, tenantId: entry.tenantId }, 'Error enviando recordatorio via cliente');
+                }
             }
             logger.warn({ chatId }, 'No se pudo enviar recordatorio: ningún cliente disponible');
         });
@@ -36,6 +50,7 @@ const startBot = async () => {
 const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Señal recibida. Cerrando limpiamente...');
     try {
+        stopCleanup();
         await destroyAllClients();
         logger.info('Bot cerrado limpiamente');
     } catch (error) {
