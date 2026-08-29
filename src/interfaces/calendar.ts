@@ -56,3 +56,24 @@ export interface CalendarService {
         services?: Service[]
     ): Promise<BookingResult>;
 }
+
+export interface AppointmentReminderParams {
+    chatId: string;
+    businessName: string;
+    date: string;
+    startHour: number;
+    customer: BookingCustomer;
+    services: Service[];
+}
+
+export interface PendingReminder {
+    id: string;
+    chatId: string;
+    businessName: string;
+    date: string;
+    startHour: number;
+    leadHours: number;
+    message: string;
+    scheduledAt: string;
+    createdAt: string;
+}
